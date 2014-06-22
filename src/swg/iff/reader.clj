@@ -40,123 +40,120 @@
           (reduce str))))
 
 (defn read-vec
-  [buf n]
-  (into [] (repeatedly n #(.getFloat buf))))
+  [buf n pos]
+  (into [] (map #(.getFloat buf %) (range pos (+ pos (* n 4)) 4))))
 
 (defn parse-vertex
-  [vertex-data bytes-per-vertex]
+  [vertex-data bytes-per-vertex pos]
   (case bytes-per-vertex
-    32 {:position (read-vec vertex-data 3)
-        :normal (read-vec vertex-data 3)
-        :texture-coords-0uv (read-vec vertex-data 2)}
-    36 {:position (read-vec vertex-data 3)
-        :normal (read-vec vertex-data 3)
-        :color (into [] (repeatedly 4 #(.get vertex-data)))
-        :texture-coords-0uv (read-vec vertex-data 2)}
-    40 {:position (read-vec vertex-data 3)
-        :normal (read-vec vertex-data 3)
-        :texture-coords-0uv (read-vec vertex-data 2)
-        :texture-coords-1uv (read-vec vertex-data 2)}
-    44 {:position (read-vec vertex-data 3)
-        :normal (read-vec vertex-data 3)
-        :color (into [] (repeatedly 4 #(.get vertex-data)))
-        :texture-coords-0uv (read-vec vertex-data 2)
-        :texture-coords-1uv (read-vec vertex-data 2)}
-    48 {:position (read-vec vertex-data 3)
-        :normal (read-vec vertex-data 3)
-        :texture-coords-0uv (read-vec vertex-data 2)
-        :texture-coords-1uv (read-vec vertex-data 2)
-        :texture-coords-2uv (read-vec vertex-data 2)}
-    52 {:position (read-vec vertex-data 3)
-        :normal (read-vec vertex-data 3)
-        :color (into [] (repeatedly 4 #(.get vertex-data)))
-        :texture-coords-0uv (read-vec vertex-data 2)
-        :texture-coords-1uv (read-vec vertex-data 2)
-        :texture-coords-2uv (read-vec vertex-data 2)}
-    56 {:position (read-vec vertex-data 3)
-        :normal (read-vec vertex-data 3)
-        :texture-coords-0uv (read-vec vertex-data 2)
-        :texture-coords-1uv (read-vec vertex-data 2)
-        :texture-coords-2uv (read-vec vertex-data 2)
-        :texture-coords-3uv (read-vec vertex-data 2)}
-    60 {:position (read-vec vertex-data 3)
-        :normal (read-vec vertex-data 3)
-        :color (into [] (repeatedly 4 #(.get vertex-data)))
-        :texture-coords-0uv (read-vec vertex-data 2)
-        :texture-coords-1uv (read-vec vertex-data 2)
-        :texture-coords-2uv (read-vec vertex-data 2)
-        :texture-coords-3uv (read-vec vertex-data 2)}
-    64 {:position (read-vec vertex-data 3)
-        :normal (read-vec vertex-data 3)
-        :texture-coords-0uv (read-vec vertex-data 2)
-        :texture-coords-1uv (read-vec vertex-data 2)
-        :texture-coords-2uv (read-vec vertex-data 2)
-        :texture-coords-3uv (read-vec vertex-data 2)
-        :texture-coords-4uv (read-vec vertex-data 2)}
-    68 {:position (read-vec vertex-data 3)
-        :normal (read-vec vertex-data 3)
-        :color (into [] (repeatedly 4 #(.get vertex-data)))
-        :texture-coords-0uv (read-vec vertex-data 2)
-        :texture-coords-1uv (read-vec vertex-data 2)
-        :texture-coords-2uv (read-vec vertex-data 2)
-        :texture-coords-3uv (read-vec vertex-data 2)
-        :texture-coords-4uv (read-vec vertex-data 2)}
-    72 {:position (read-vec vertex-data 3)
-        :normal (read-vec vertex-data 3)
-        :texture-coords-0uv (read-vec vertex-data 2)
-        :texture-coords-1uv (read-vec vertex-data 2)
-        :texture-coords-2uv (read-vec vertex-data 2)
-        :texture-coords-3uv (read-vec vertex-data 2)
-        :texture-coords-4uv (read-vec vertex-data 2)
-        :texture-coords-5uv (read-vec vertex-data 2)}))
+    32 {:position (read-vec vertex-data 3 pos)
+        :normal (read-vec vertex-data 3 (+ 12 pos))
+        :texture-coords-0uv (read-vec vertex-data 2 (+ 24 pos))}
+    36 {:position (read-vec vertex-data 3 pos)
+        :normal (read-vec vertex-data 3 (+ 12 pos))
+        :color (into [] (map #(.get vertex-data %)
+                             (range (+ 24 pos) (+ 28 pos))))
+        :texture-coords-0uv (read-vec vertex-data 2 (+ 28 pos))}
+    ;; 40 {:position (read-vec vertex-data 3)
+    ;;     :normal (read-vec vertex-data 3)
+    ;;     :texture-coords-0uv (read-vec vertex-data 2)
+    ;;     :texture-coords-1uv (read-vec vertex-data 2)}
+    ;; 44 {:position (read-vec vertex-data 3)
+    ;;     :normal (read-vec vertex-data 3)
+    ;;     :color (into [] (repeatedly 4 #(.get vertex-data)))
+    ;;     :texture-coords-0uv (read-vec vertex-data 2)
+    ;;     :texture-coords-1uv (read-vec vertex-data 2)}
+    ;; 48 {:position (read-vec vertex-data 3)
+    ;;     :normal (read-vec vertex-data 3)
+    ;;     :texture-coords-0uv (read-vec vertex-data 2)
+    ;;     :texture-coords-1uv (read-vec vertex-data 2)
+    ;;     :texture-coords-2uv (read-vec vertex-data 2)}
+    ;; 52 {:position (read-vec vertex-data 3)
+    ;;     :normal (read-vec vertex-data 3)
+    ;;     :color (into [] (repeatedly 4 #(.get vertex-data)))
+    ;;     :texture-coords-0uv (read-vec vertex-data 2)
+    ;;     :texture-coords-1uv (read-vec vertex-data 2)
+    ;;     :texture-coords-2uv (read-vec vertex-data 2)}
+    ;; 56 {:position (read-vec vertex-data 3)
+    ;;     :normal (read-vec vertex-data 3)
+    ;;     :texture-coords-0uv (read-vec vertex-data 2)
+    ;;     :texture-coords-1uv (read-vec vertex-data 2)
+    ;;     :texture-coords-2uv (read-vec vertex-data 2)
+    ;;     :texture-coords-3uv (read-vec vertex-data 2)}
+    ;; 60 {:position (read-vec vertex-data 3)
+    ;;     :normal (read-vec vertex-data 3)
+    ;;     :color (into [] (repeatedly 4 #(.get vertex-data)))
+    ;;     :texture-coords-0uv (read-vec vertex-data 2)
+    ;;     :texture-coords-1uv (read-vec vertex-data 2)
+    ;;     :texture-coords-2uv (read-vec vertex-data 2)
+    ;;     :texture-coords-3uv (read-vec vertex-data 2)}
+    ;; 64 {:position (read-vec vertex-data 3)
+    ;;     :normal (read-vec vertex-data 3)
+    ;;     :texture-coords-0uv (read-vec vertex-data 2)
+    ;;     :texture-coords-1uv (read-vec vertex-data 2)
+    ;;     :texture-coords-2uv (read-vec vertex-data 2)
+    ;;     :texture-coords-3uv (read-vec vertex-data 2)
+    ;;     :texture-coords-4uv (read-vec vertex-data 2)}
+    ;; 68 {:position (read-vec vertex-data 3)
+    ;;     :normal (read-vec vertex-data 3)
+    ;;     :color (into [] (repeatedly 4 #(.get vertex-data)))
+    ;;     :texture-coords-0uv (read-vec vertex-data 2)
+    ;;     :texture-coords-1uv (read-vec vertex-data 2)
+    ;;     :texture-coords-2uv (read-vec vertex-data 2)
+    ;;     :texture-coords-3uv (read-vec vertex-data 2)
+    ;;     :texture-coords-4uv (read-vec vertex-data 2)}
+    ;; 72 {:position (read-vec vertex-data 3)
+    ;;     :normal (read-vec vertex-data 3)
+    ;;     :texture-coords-0uv (read-vec vertex-data 2)
+    ;;     :texture-coords-1uv (read-vec vertex-data 2)
+    ;;     :texture-coords-2uv (read-vec vertex-data 2)
+    ;;     :texture-coords-3uv (read-vec vertex-data 2)
+    ;;     :texture-coords-4uv (read-vec vertex-data 2)
+    ;;     :texture-coords-5uv (read-vec vertex-data 2)}
+    ))
 
 (defn parse-vertices
   [vertex-data-node n]
   (let [vertex-data-length (.capacity (:data vertex-data-node))
         bytes-per-vertex (/ vertex-data-length n)
         vertex-data (:data vertex-data-node)]
-    (loop [vertices []]
-      (if (< (.position vertex-data) (.capacity vertex-data))
-        (let [vertex (parse-vertex vertex-data bytes-per-vertex)]
-          (recur (conj vertices vertex)))
-        vertices))))
+    (->> (iterate #(+ % bytes-per-vertex) 0)
+         (take-while #(< % vertex-data-length))
+         (pmap #(parse-vertex vertex-data bytes-per-vertex %))
+         (into []))))
 
 (defn parse-indices
   [{:keys [data size] :as vertex-index-node}]
   (let [n (.getInt data)
+        index-data-length (.capacity data)
         bytes-per-index (/ (- size 4) n)]
-    (loop [indices []]
-      (let []
-        (if (< (count indices) n)
-          (case bytes-per-index
-            2 (recur (conj indices (.getShort data)))
-            4 (recur (conj indices (.getInt data))))
-          indices)))))
+    (->> (iterate #(+ % bytes-per-index) 0)
+         (take-while #(< % index-data-length))
+         (pmap #(case bytes-per-index
+                  2 (.getShort data %)
+                  4 (.getInt data %)))
+         (into []))))
+
+(defn parse-geometry
+  [root-geometry-node idx]
+  (let [node (->> (:children root-geometry-node)
+                  (filter #(= (:type %) (str "000" (inc idx))))
+                  first)]
+    {:shader (parse-string (:data (get-child node "NAME")))
+     :vertices (parse-vertices (get-child node "DATA")
+                               (-> (get-child node "VTXA")
+                                   (get-child "INFO")
+                                   (:data)
+                                   (.getInt 4)))
+     :indices (parse-indices (get-child node "INDX"))}))
 
 (defn parse-mesh
   [root]
   (let [root-geometry-node (first (:children (get-child root "SPS ")))
         geometry-count (.getInt (:data (get-child root-geometry-node "CNT ")))
-        geometries
-        (reduce (fn [coll idx]
-                  (let [type (str "000" (inc idx))
-                        node (->> (:children root-geometry-node)
-                                  (filter #(= (:type %) type))
-                                  (first))
-                        data (:data (get-child node "NAME"))
-                        shader (when data (parse-string data))
-                        vertex-node (get-child node "VTXA")
-                        num-vertices (-> (:data (get-child vertex-node "INFO"))
-                                         (.getInt 4))
-                        vertex-data-node (get-child node "DATA")
-                        vertices (parse-vertices vertex-data-node num-vertices)
-                        vertex-index-node (get-child node "INDX")
-                        indices (parse-indices vertex-index-node)]
-                    (conj coll {:shader shader
-                                :vertices vertices
-                                :indices indices})))
-                [] (range geometry-count))]
-    geometries))
+        geometries (pmap #(parse-geometry root-geometry-node %)
+                         (range geometry-count))]
+    (into [] geometries)))
 
 (defn parse-iff
   [buf]
