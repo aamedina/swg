@@ -63,7 +63,7 @@
 (defn triangles-node
   [id {:keys [shader vertices indices] :as geometry}]
   (xml/element :triangles {:material (str id "-material")
-                           :count (count indices)}))
+                           :count (/ (count indices) 3)}))
 
 (defn source-node
   [id name {:keys [shader vertices indices] :as geometry}]
@@ -94,5 +94,50 @@
                       [] geometries)]
     (xml/element :library_geometries {} xs)))
 
+(defn library-cameras-node
+  []
+  (xml/element :library_cameras {}))
+
+(defn library-lights-node
+  []
+  (xml/element :library_lights {}))
+
+(defn library-materials-node
+  []
+  (xml/element :library_materials {}))
+
+(defn library-effects-node
+  []
+  (xml/element :library_effects {}))
+
+(defn library-geometries-node
+  []
+  (xml/element :library_geometries {}))
+
+(defn library-visual-scenes-node
+  []
+  (xml/element :library_geometries {}))
+
+(defn scene-node
+  []
+  (xml/element :scene {}))
+
+(defn export-collada
+  [mesh]
+  (xml/element :COLLADA {:xmlns "http://www.collada.org/2005/11/COLLADASchema"
+                         :version "1.4.1"}
+               (->> (xml/element :author {} "Adrian Medina")
+                    (xml/element :contributor {})
+                    (xml/element :asset {}))
+               (library-cameras-node)
+               (library-lights-node)
+               (library-materials-node)
+               (library-effects-node)
+               (library-geometries-node)
+               (library-visual-scenes-node)
+               (scene-node)))
+
 (def star-destroyer
-  (xml/emit-str (export-mesh iff/test-iff)))
+  (xml/emit-str (export-collada iff/test-iff))
+  #_(spit "resources/star_destroyer.dae"
+        (xml/emit-str (export-collada iff/test-iff))))
