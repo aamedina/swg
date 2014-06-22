@@ -48,12 +48,12 @@
   (case bytes-per-vertex
     32 {:position (read-vec vertex-data 3 pos)
         :normal (read-vec vertex-data 3 (+ 12 pos))
-        :texture-coords-0uv (read-vec vertex-data 2 (+ 24 pos))}
+        :texture-coords [(read-vec vertex-data 2 (+ 24 pos))]}
     36 {:position (read-vec vertex-data 3 pos)
         :normal (read-vec vertex-data 3 (+ 12 pos))
         :color (into [] (map #(.get vertex-data %)
                              (range (+ 24 pos) (+ 28 pos))))
-        :texture-coords-0uv (read-vec vertex-data 2 (+ 28 pos))}
+        :texture-coords [(read-vec vertex-data 2 (+ 28 pos))]}
     ;; 40 {:position (read-vec vertex-data 3)
     ;;     :normal (read-vec vertex-data 3)
     ;;     :texture-coords-0uv (read-vec vertex-data 2)
