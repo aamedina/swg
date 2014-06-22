@@ -4,6 +4,36 @@
             [clojure.string :as str]
             [clojure.java.io :as io]))
 
+(defn format-floats
+  [floats flip-z?]
+  (->> (map (fn [[x y z]]
+              (if flip-z?
+                [x y (- z)]
+                [x y z])) floats)
+       (reduce into [])
+       (map #(format "%.5f" %))
+       (str/join " ")))
+
+(defn format-texture-coords
+  [texture-coords idx flip-v?]
+  (->> (map #(nth % idx) texture-coords)
+       (map (fn [[x y]]
+              (if flip-v?
+                [x (- 1.0 y)]
+                [x y])))
+       (reduce into [])
+       (map #(format "%.5f" %))
+       (str/join " ")))
+
+(defn format-indices
+  [indices reverse?]
+  (->> (map (fn [[x y z]]
+              (if reverse?
+                [z y x]
+                [x y z])) (partition 3 indices))
+       (reduce into [])
+       (str/join " ")))
+
 (defn geometry
   [idx {:keys [shader vertices indices] :as geometry}]
   (let [id (str "meshGeometry" idx)]
@@ -12,7 +42,7 @@
       [:source {:id (str id "-positions") :name "position"}
        [:float_array {:id (str id "-positions-array")
                       :count (* (count vertices) 3)}
-        (str/join " " (reduce into [] (map :position vertices)))]
+        (format-floats (map :position vertices) true)]
        [:technique_common
         [:accessor {:source (str "#" id "-positions-array")
                     :count (str (count vertices))
@@ -23,7 +53,7 @@
       [:source {:id (str id "-normals") :name "normal"}
        [:float_array {:id (str id "-normals-array")
                       :count (* (count vertices) 3)}
-        (str/join " " (reduce into [] (map :normal vertices)))]
+        (format-floats (map :normal vertices) true)]
        [:technique_common
         [:accessor {:source (str "#" id "-normals-array")
                     :count (str (count vertices))
@@ -34,8 +64,7 @@
       [:source {:id (str id "-maps") :name "map"}
        [:float_array {:id (str id "-maps-array")
                       :count (* (count indices) 2)}
-        (str/join " " (reduce into [] (reduce into []
-                                              (map :texture-coords vertices))))]
+        (format-texture-coords (map :texture-coords vertices) 0 true)]
        [:technique_common
         [:accessor {:source (str "#" id "-maps-array")
                     :count (str (count indices))
@@ -51,11 +80,12 @@
                 :offset "0"}]
        [:input {:semantic "NORMAL"
                 :source (str "#" id "-normals")
-                :offset "0"}]
+                :offset "1"}]
        [:input {:semantic "TEXCOORD"
                 :source (str "#" id "-maps")
-                :offset "0"}]
-       (str/join " " indices)]]]))
+                :offset "2"
+                :set "0"}]
+       [:p (format-indices indices true)]]]]))
 
 (defn technique-common
   [child]
@@ -98,8 +128,9 @@
 (defn library-images
   [shaders]
   (xml/as-elements [:library_images
-                    (for [shader shaders
-                          n (range (count shaders))
+                    (for [[shader n] (->> (range (count shaders))
+                                          (interleave shaders)
+                                          (partition 2))
                           :let [id (str "Image" n)]]
                       [:image {:id id :name id :depth "1"}
                        [:init_from shader]])]))
@@ -147,9 +178,10 @@
   [geometries]
   (xml/as-elements
    [:library_geometries
-    (for [geometry geometries
-          n (range (count geometries))]
-      (geometry n geometry))]))
+    (for [[geo n] (->> (range (count geometries))
+                       (interleave geometries)
+                       (partition 2))]
+      (geometry n geo))]))
 
 (defn library-visual-scenes
   [geometries]
@@ -172,37 +204,16 @@
   []
   (xml/as-elements [:scene [:instance_visual_scene {:url "#VisualSceneNode"}]]))
 
-(defn author
-  [author]
-  (xml/element :author {} author))
-
-(defn authoring-tool
-  [tool]
-  (xml/element :authoring_tool {} tool))
-
-(defn comments
-  [text]
-  (xml/element :comments {} text))
-
-(defn copyright
-  [text]
-  (xml/element :copyright {} text))
-
-(defn contributor
-  [name tool comments-text copyright-text]
-  (xml/element :contributor {}
-               (author name)
-               (authoring-tool tool)
-               (comments comments-text)
-               (copyright copyright-text)))
-
 (defn asset
   []
-  (xml/element :asset {}
-               (contributor "Sony Online Entertainment"
-                            "Unknown"
-                            "Clojure rules"
-                            "Copyright 2014 Sony Online Entertainment")))
+  (xml/as-elements [:asset
+                    [:contributor
+                     [:author "Sony Online Entertainment"]
+                     [:authoring_tool "Unknown"]
+                     [:comment "Clojure rules!"]
+                     [:copyright "Copyright 2014 Sony Online Entertainment"]]
+                    [:unit {:meter "0.1.0" :name "centimeter"}]
+                    [:up_axis "Y_UP"]]))
 
 (defn export-collada
   [mesh]
