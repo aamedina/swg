@@ -12,6 +12,7 @@
                  [org.clojure/test.check "0.5.8"]
                  [org.clojure/tools.cli "0.3.1"]
                  [org.clojure/core.match "0.2.1"]
+                 [org.clojure/data.xml "0.0.7"]
                  [io.netty/netty-all "5.0.0.Alpha2-SNAPSHOT"]
                  [clojurewerkz/buffy "1.0.0-beta4"]
                  [com.stuartsierra/component "0.2.1"]

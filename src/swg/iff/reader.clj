@@ -153,7 +153,7 @@
         geometry-count (.getInt (:data (get-child root-geometry-node "CNT ")))
         geometries (pmap #(parse-geometry root-geometry-node %)
                          (range geometry-count))]
-    (into [] geometries)))
+    {:geometries (into [] geometries)}))
 
 (defn parse-iff
   [buf]
