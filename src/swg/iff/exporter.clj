@@ -1,98 +1,61 @@
 (ns swg.iff.exporter
   (:require [swg.iff.reader :as iff]
             [clojure.data.xml :as xml]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            [clojure.java.io :as io]))
 
-(defn param-node
-  [vertex]
-  (xml/element :param {:name vertex :type "float"}))
-
-(defn accessor-node
-  [id {:keys [shader vertices indices] :as geometry}]
-  (let [id (str "#" id "-array")]
-    (xml/element :accessor {:source id
-                            :count (count vertices)
-                            :stride 3}
-                 [(param-node "x") (param-node "y") (param-node "z")])))
-
-(defn technique-common-node
-  [id {:keys [shader vertices indices] :as geometry}]
-  (xml/element :technique_common {} (accessor-node id geometry)))
-
-(defn positions-str
-  [vertices flip-z?]
-  (->> (for [{:keys [position]} vertices
-             :let [[x y z] position
-                   z (if flip-z? (- z) z)]]
-         (format "{0:0.%.6f} {1:0.%.6f} {2:0.%.6f}" x y z))
-       (str/join " ")))
-
-(defn normals-str
-  [vertices flip-z?]
-  (->> (for [{:keys [normal]} vertices
-             :let [[x y z] normal
-                   z (if flip-z? (- z) z)]]
-         (format "{0:0.%.6f} {1:0.%.6f} {2:0.%.6f}" x y z))
-       (str/join " ")))
-
-(defn texture-coords-str
-  [vertices idx flip-v?]
-  (->> (for [{:keys [texture-coords]} vertices
-             :let [[x y] (nth texture-coords idx)
-                   y (if flip-v? (- 1.0 y) y)]]
-         (format "{0:0.%.6f} {1:0.%.6f}" x y))
-       (str/join " ")))
-
-(defn triangle-points-str
-  [indices reverse?]
-  (if reverse?
-    (str/join " " (map #(format "{%d}" %) indices))
-    (str/join " " (map #(format "{%d}" %) indices))))
-
-(defn float-array-node
-  [id {:keys [shader vertices indices] :as geometry}]
-  (let [id (str id "-array")]
-    (xml/element :float_array {:id id :count (* (count vertices) 3)}
-                 (positions-str vertices true))))
-
-(defn vertices-node
-  [id {:keys [shader vertices indices] :as geometry}]
-  (xml/element :vertices {:id (str id "-vertices")
-                          :source (str id "-positions")}))
-
-(defn triangles-node
-  [id {:keys [shader vertices indices] :as geometry}]
-  (xml/element :triangles {:material (str id "-material")
-                           :count (/ (count indices) 3)}))
-
-(defn source-node
-  [id name {:keys [shader vertices indices] :as geometry}]
-  (let [id (str id "-" name "s")]
-    (xml/element :source {:id id :name name}
-                 [(float-array-node id geometry)
-                  (technique-common-node id geometry)])))
-
-(defn mesh-node
-  [id {:keys [shader vertices indices] :as geometry}]
-  (xml/element :mesh {}
-               (source-node id "position" geometry)
-               (source-node id "normal" geometry)
-               (source-node id "map" geometry)
-               (vertices-node id geometry)
-               (triangles-node id geometry)))
-
-(defn geometry-node
+(defn geometry
   [idx {:keys [shader vertices indices] :as geometry}]
   (let [id (str "meshGeometry" idx)]
-    (xml/element :geometry {:id id :name id}
-                 (mesh-node id geometry))))
-
-(defn export-mesh
-  [{:keys [geometries] :as mesh}]
-  (let [xs (reduce-kv (fn [coll idx geometry]                       
-                        (conj coll (geometry-node idx geometry)))
-                      [] geometries)]
-    (xml/element :library_geometries {} xs)))
+    [:geometry {:id id :name id}
+     [:mesh
+      [:source {:id (str id "-positions") :name "position"}
+       [:float_array {:id (str id "-positions-array")
+                      :count (* (count vertices) 3)}
+        (str/join " " (reduce into [] (map :position vertices)))]
+       [:technique_common
+        [:accessor {:source (str "#" id "-positions-array")
+                    :count (str (count vertices))
+                    :stride "3"}
+         [:param {:name "X" :type "float"}]
+         [:param {:name "Y" :type "float"}]
+         [:param {:name "Z" :type "float"}]]]]
+      [:source {:id (str id "-normals") :name "normal"}
+       [:float_array {:id (str id "-normals-array")
+                      :count (* (count vertices) 3)}
+        (str/join " " (reduce into [] (map :normal vertices)))]
+       [:technique_common
+        [:accessor {:source (str "#" id "-normals-array")
+                    :count (str (count vertices))
+                    :stride "3"}
+         [:param {:name "X" :type "float"}]
+         [:param {:name "Y" :type "float"}]
+         [:param {:name "Z" :type "float"}]]]]
+      [:source {:id (str id "-maps") :name "map"}
+       [:float_array {:id (str id "-maps-array")
+                      :count (* (count indices) 2)}
+        (str/join " " (reduce into [] (reduce into []
+                                              (map :texture-coords vertices))))]
+       [:technique_common
+        [:accessor {:source (str "#" id "-maps-array")
+                    :count (str (count indices))
+                    :stride "2"}
+         [:param {:name "S" :type "float"}]
+         [:param {:name "T" :type "float"}]]]]
+      [:vertices {:id (str id "-vertices")}
+       [:input {:semantic "POSITION" :source (str "#" id "-positions")}]]
+      [:triangles {:material (str id "-material")
+                   :count (/ (count indices) 3)}
+       [:input {:semantic "VERTEX"
+                :source (str "#" id "-vertices")
+                :offset "0"}]
+       [:input {:semantic "NORMAL"
+                :source (str "#" id "-normals")
+                :offset "0"}]
+       [:input {:semantic "TEXCOORD"
+                :source (str "#" id "-maps")
+                :offset "0"}]
+       (str/join " " indices)]]]))
 
 (defn technique-common
   [child]
@@ -150,20 +113,64 @@
                        [:instance_effect {:url (str "#Effect" n)}]])]))
 
 (defn library-effects
-  []
-  (xml/element :library_effects {}))
+  [geometries]
+  (xml/as-elements [:library_effects
+                    (for [n (range (count geometries))
+                          :let [id (str "Effect" n)
+                                img (str "Image" n)]]
+                      [:effect {:id id}
+                       [:profile_COMMON
+                        [:new-param {:sid (str img "-surface")}
+                         [:surface {:type "2D"}
+                          [:init_from img]
+                          [:format "A8R8G8B8"]]]
+                        [:new-param {:sid (str img "-sampler")}
+                         [:sampler2D
+                          [:source (str img "-surface")]
+                          [:minfilter "LINEAR_MIPMAP_LINEAR"]
+                          [:magfilter "LINEAR"]]]
+                        [:technique {:sid "common"}
+                         [:phong
+                          [:emission [:color "0 0 0 1"]]
+                          [:ambient [:color "0 0 0 1"]]
+                          [:diffuse [:texture {:texture (str img "-sampler")
+                                               :texcoord "TEX0"}]]
+                          [:specular [:color "0 0 0 1"]]
+                          [:shininess [:float 0]]
+                          [:reflective [:color "0 0 0 1"]]
+                          [:reflectivity [:float "0.5"]]
+                          [:transparent {:opaque "RGB_ZERO"}
+                           [:color "0 0 0 1"]]
+                          [:transparent [:float "1"]]]]]])]))
 
 (defn library-geometries
-  []
-  (xml/element :library_geometries {}))
+  [geometries]
+  (xml/as-elements
+   [:library_geometries
+    (for [geometry geometries
+          n (range (count geometries))]
+      (geometry n geometry))]))
 
 (defn library-visual-scenes
-  []
-  (xml/element :library_geometries {}))
+  [geometries]
+  (xml/as-elements [:library_visual_scenes
+                    (for [n (range (count geometries))
+                          :let [geometry-url (str "#meshGeometry" n)]]
+                      [:visual_scene {:id "VisualSceneNode"
+                                      :name "untitled"}
+                       [:node {:id "Mesh" :name "Mesh" :type "NODE"}
+                        [:matrix {:sid "transform"}
+                         "1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"]
+                        [:instance_geometry {:url geometry-url}
+                         [:bind_material
+                          [:technique_common
+                           [:instance_material
+                            {:symbol (str "meshGeometry" n "-material")
+                             :target (str "Material" n)}]]]]]])]))
 
 (defn scene
   []
-  (xml/element :scene {}))
+  (xml/as-elements [:scene [:instance_visual_scene {:url "#VisualSceneNode"}]]))
 
 (defn author
   [author]
@@ -206,12 +213,12 @@
                (library-lights)
                (library-images (map :shader (:geometries mesh)))
                (library-materials (:geometries mesh))
-               (library-effects)
-               (library-geometries)
-               (library-visual-scenes)
+               (library-effects (:geometries mesh))
+               (library-geometries (:geometries mesh))
+               (library-visual-scenes (:geometries mesh))
                (scene)))
 
 (def star-destroyer
-  (let [xml (xml/emit-str (export-collada iff/test-iff))]
+  (let [xml (xml/indent-str (export-collada iff/test-iff))]
     (spit "resources/meshes/star_destroyer.dae" xml)
     xml))
