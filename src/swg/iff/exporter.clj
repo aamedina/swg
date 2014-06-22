@@ -94,50 +94,124 @@
                       [] geometries)]
     (xml/element :library_geometries {} xs)))
 
-(defn library-cameras-node
-  []
-  (xml/element :library_cameras {}))
+(defn technique-common
+  [child]
+  (xml/element :technique_common {} child))
 
-(defn library-lights-node
-  []
-  (xml/element :library_lights {}))
+(defn perspective
+  [yfov aspect-ratio znear zfar]
+  (xml/as-elements [:perspective
+                    [:yfov yfov]
+                    [:aspect_ratio aspect-ratio]
+                    [:znear znear]
+                    [:zfar zfar]]))
 
-(defn library-materials-node
+(defn optics
   []
-  (xml/element :library_materials {}))
+  (xml/element :optics {} (technique-common (perspective 37.8492 1.5 1 10000))))
 
-(defn library-effects-node
+(defn camera
+  [n]
+  (xml/element :camera {:id (str "cameraShape" n)
+                        :name (str "cameraShape" n)}
+               (optics)))
+
+(defn library-cameras
+  []
+  (xml/element :library_cameras {} (camera 0)))
+
+(defn directional-light
+  [n]
+  (xml/as-elements [:light {:id (str "directionalLightShape" n "-lib")
+                            :name (str "directionalLightShape" n)}
+                    [:technique-common
+                     [:directional
+                      [:color (str/join " " [1 1 1])]]]]))
+
+(defn library-lights
+  []
+  (xml/element :library_lights {} (directional-light 0)))
+
+(defn library-images
+  [shaders]
+  (xml/as-elements [:library_images
+                    (for [shader shaders
+                          n (range (count shaders))
+                          :let [id (str "Image" n)]]
+                      [:image {:id id :name id :depth "1"}
+                       [:init_from shader]])]))
+
+(defn library-materials
+  [geometries]
+  (xml/as-elements [:library_materials
+                    (for [n (range (count geometries))
+                          :let [id (str "Material" n)]]
+                      [:material {:id id :name id}
+                       [:instance_effect {:url (str "#Effect" n)}]])]))
+
+(defn library-effects
   []
   (xml/element :library_effects {}))
 
-(defn library-geometries-node
+(defn library-geometries
   []
   (xml/element :library_geometries {}))
 
-(defn library-visual-scenes-node
+(defn library-visual-scenes
   []
   (xml/element :library_geometries {}))
 
-(defn scene-node
+(defn scene
   []
   (xml/element :scene {}))
+
+(defn author
+  [author]
+  (xml/element :author {} author))
+
+(defn authoring-tool
+  [tool]
+  (xml/element :authoring_tool {} tool))
+
+(defn comments
+  [text]
+  (xml/element :comments {} text))
+
+(defn copyright
+  [text]
+  (xml/element :copyright {} text))
+
+(defn contributor
+  [name tool comments-text copyright-text]
+  (xml/element :contributor {}
+               (author name)
+               (authoring-tool tool)
+               (comments comments-text)
+               (copyright copyright-text)))
+
+(defn asset
+  []
+  (xml/element :asset {}
+               (contributor "Sony Online Entertainment"
+                            "Unknown"
+                            "Clojure rules"
+                            "Copyright 2014 Sony Online Entertainment")))
 
 (defn export-collada
   [mesh]
   (xml/element :COLLADA {:xmlns "http://www.collada.org/2005/11/COLLADASchema"
                          :version "1.4.1"}
-               (->> (xml/element :author {} "Adrian Medina")
-                    (xml/element :contributor {})
-                    (xml/element :asset {}))
-               (library-cameras-node)
-               (library-lights-node)
-               (library-materials-node)
-               (library-effects-node)
-               (library-geometries-node)
-               (library-visual-scenes-node)
-               (scene-node)))
+               (asset)
+               (library-cameras)
+               (library-lights)
+               (library-images (map :shader (:geometries mesh)))
+               (library-materials (:geometries mesh))
+               (library-effects)
+               (library-geometries)
+               (library-visual-scenes)
+               (scene)))
 
 (def star-destroyer
-  (xml/emit-str (export-collada iff/test-iff))
-  #_(spit "resources/star_destroyer.dae"
-        (xml/emit-str (export-collada iff/test-iff))))
+  (let [xml (xml/emit-str (export-collada iff/test-iff))]
+    (spit "resources/meshes/star_destroyer.dae" xml)
+    xml))
