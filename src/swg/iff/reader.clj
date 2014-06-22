@@ -2,7 +2,8 @@
   (:require [clojure.java.io :as io]
             [clojure.tools.namespace.repl :refer [refresh-all]]
             [clojure.zip :as zip]
-            [clojure.string :as str])
+            [clojure.string :as str]
+            [clojure.core.reducers :as r])
   (:import (java.io RandomAccessFile)
            (java.nio ByteBuffer ByteOrder MappedByteBuffer)
            (java.nio.channels FileChannel FileChannel$MapMode)))
@@ -30,10 +31,6 @@
   (->> (node-seq root)
        (filter #(= (:type %) child-name))
        first))
-
-(defn get-descendant
-  [root descendant-name]
-  )
 
 (defn parse-string
   ([buf] (parse-string buf (dec (.capacity buf))))
@@ -121,30 +118,45 @@
     (loop [vertices []]
       (if (< (.position vertex-data) (.capacity vertex-data))
         (let [vertex (parse-vertex vertex-data bytes-per-vertex)]
-          (conj vertices vertex))
+          (recur (conj vertices vertex)))
         vertices))))
+
+(defn parse-indices
+  [{:keys [data size] :as vertex-index-node}]
+  (let [n (.getInt data)
+        bytes-per-index (/ (- size 4) n)]
+    (loop [indices []]
+      (let []
+        (if (< (count indices) n)
+          (case bytes-per-index
+            2 (recur (conj indices (.getShort data)))
+            4 (recur (conj indices (.getInt data))))
+          indices)))))
 
 (defn parse-mesh
   [root]
   (let [root-geometry-node (first (:children (get-child root "SPS ")))
-        geometry-count (.getInt (:data (get-child root-geometry-node "CNT ")))]
-    (reduce (fn [coll idx]
-              (let [type (str "000" (inc idx))
-                    node (->> (:children root-geometry-node)
-                              (filter #(= (:type %) type))
-                              (first))
-                    data (:data (get-child node "NAME"))
-                    shader (when data (parse-string data))
-                    vertex-node (get-child node "VTXA")
-                    num-vertices (-> (:data (get-child vertex-node "INFO"))
-                                     (.getInt 4))
-                    vertex-data-node (get-child node "DATA")
-                    vertex-data-length (.capacity (:data vertex-data-node))
-                    bytes-per-vertex (/ vertex-data-length num-vertices)
-                    vertex-data (:data vertex-data-node)
-                    vertices (parse-vertices vertex-data-node num-vertices)]
-                (conj coll vertices)))
-            [] (range geometry-count))))
+        geometry-count (.getInt (:data (get-child root-geometry-node "CNT ")))
+        geometries
+        (reduce (fn [coll idx]
+                  (let [type (str "000" (inc idx))
+                        node (->> (:children root-geometry-node)
+                                  (filter #(= (:type %) type))
+                                  (first))
+                        data (:data (get-child node "NAME"))
+                        shader (when data (parse-string data))
+                        vertex-node (get-child node "VTXA")
+                        num-vertices (-> (:data (get-child vertex-node "INFO"))
+                                         (.getInt 4))
+                        vertex-data-node (get-child node "DATA")
+                        vertices (parse-vertices vertex-data-node num-vertices)
+                        vertex-index-node (get-child node "INDX")
+                        indices (parse-indices vertex-index-node)]
+                    (conj coll {:shader shader
+                                :vertices vertices
+                                :indices indices})))
+                [] (range geometry-count))]
+    geometries))
 
 (defn parse-iff
   [buf]
@@ -192,4 +204,4 @@
 
 (def test-iff
   (let [path "resources/extracted/appearance/mesh/star_destroyer.msh"]
-    (parse-mesh (iff-buffer path))))
+    (time (parse-mesh (iff-buffer path)))))
