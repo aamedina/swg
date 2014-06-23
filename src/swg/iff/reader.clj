@@ -56,76 +56,78 @@
 
 (defn read-vec
   [buf n pos]
-  (into [] (map #(.getFloat buf %) (range pos (+ pos (* n 4)) 4))))
+  (mapv #(.getFloat buf %) (range pos (+ pos (* n 4)) 4)))
+
+(defn read-color
+  [buf pos]
+  (mapv #(get-unsigned-byte buf %) (range pos (+ 4 pos))))
 
 (defn parse-vertex
   [vertex-data bytes-per-vertex pos]
   (case bytes-per-vertex
-    32 {:position (read-vec vertex-data 3 pos)
-        :normal (read-vec vertex-data 3 (+ 12 pos))
-        :texture-coords [(read-vec vertex-data 2 (+ 24 pos))]}
-    36 {:position (read-vec vertex-data 3 pos)
-        :normal (read-vec vertex-data 3 (+ 12 pos))
-        :color (into [] (map #(get-unsigned-byte vertex-data %)
-                             (range (+ 24 pos) (+ 28 pos))))
-        :texture-coords [(read-vec vertex-data 2 (+ 28 pos))]}
-    ;; 40 {:position (read-vec vertex-data 3)
-    ;;     :normal (read-vec vertex-data 3)
-    ;;     :texture-coords-0uv (read-vec vertex-data 2)
-    ;;     :texture-coords-1uv (read-vec vertex-data 2)}
-    ;; 44 {:position (read-vec vertex-data 3)
-    ;;     :normal (read-vec vertex-data 3)
-    ;;     :color (into [] (repeatedly 4 #(.get vertex-data)))
-    ;;     :texture-coords-0uv (read-vec vertex-data 2)
-    ;;     :texture-coords-1uv (read-vec vertex-data 2)}
-    ;; 48 {:position (read-vec vertex-data 3)
-    ;;     :normal (read-vec vertex-data 3)
-    ;;     :texture-coords-0uv (read-vec vertex-data 2)
-    ;;     :texture-coords-1uv (read-vec vertex-data 2)
-    ;;     :texture-coords-2uv (read-vec vertex-data 2)}
-    ;; 52 {:position (read-vec vertex-data 3)
-    ;;     :normal (read-vec vertex-data 3)
-    ;;     :color (into [] (repeatedly 4 #(.get vertex-data)))
-    ;;     :texture-coords-0uv (read-vec vertex-data 2)
-    ;;     :texture-coords-1uv (read-vec vertex-data 2)
-    ;;     :texture-coords-2uv (read-vec vertex-data 2)}
-    ;; 56 {:position (read-vec vertex-data 3)
-    ;;     :normal (read-vec vertex-data 3)
-    ;;     :texture-coords-0uv (read-vec vertex-data 2)
-    ;;     :texture-coords-1uv (read-vec vertex-data 2)
-    ;;     :texture-coords-2uv (read-vec vertex-data 2)
-    ;;     :texture-coords-3uv (read-vec vertex-data 2)}
-    ;; 60 {:position (read-vec vertex-data 3)
-    ;;     :normal (read-vec vertex-data 3)
-    ;;     :color (into [] (repeatedly 4 #(.get vertex-data)))
-    ;;     :texture-coords-0uv (read-vec vertex-data 2)
-    ;;     :texture-coords-1uv (read-vec vertex-data 2)
-    ;;     :texture-coords-2uv (read-vec vertex-data 2)
-    ;;     :texture-coords-3uv (read-vec vertex-data 2)}
-    ;; 64 {:position (read-vec vertex-data 3)
-    ;;     :normal (read-vec vertex-data 3)
-    ;;     :texture-coords-0uv (read-vec vertex-data 2)
-    ;;     :texture-coords-1uv (read-vec vertex-data 2)
-    ;;     :texture-coords-2uv (read-vec vertex-data 2)
-    ;;     :texture-coords-3uv (read-vec vertex-data 2)
-    ;;     :texture-coords-4uv (read-vec vertex-data 2)}
-    ;; 68 {:position (read-vec vertex-data 3)
-    ;;     :normal (read-vec vertex-data 3)
-    ;;     :color (into [] (repeatedly 4 #(.get vertex-data)))
-    ;;     :texture-coords-0uv (read-vec vertex-data 2)
-    ;;     :texture-coords-1uv (read-vec vertex-data 2)
-    ;;     :texture-coords-2uv (read-vec vertex-data 2)
-    ;;     :texture-coords-3uv (read-vec vertex-data 2)
-    ;;     :texture-coords-4uv (read-vec vertex-data 2)}
-    ;; 72 {:position (read-vec vertex-data 3)
-    ;;     :normal (read-vec vertex-data 3)
-    ;;     :texture-coords-0uv (read-vec vertex-data 2)
-    ;;     :texture-coords-1uv (read-vec vertex-data 2)
-    ;;     :texture-coords-2uv (read-vec vertex-data 2)
-    ;;     :texture-coords-3uv (read-vec vertex-data 2)
-    ;;     :texture-coords-4uv (read-vec vertex-data 2)
-    ;;     :texture-coords-5uv (read-vec vertex-data 2)}
-    ))
+    32 [(read-vec vertex-data 3 pos)
+        (read-vec vertex-data 3 (+ 12 pos))
+        [(read-vec vertex-data 2 (+ 24 pos))]]
+    36 [(read-vec vertex-data 3 pos)
+        (read-vec vertex-data 3 (+ 12 pos))
+        (read-color vertex-data (+ 24 pos))
+        [(read-vec vertex-data 2 (+ 28 pos))]]
+    40 [(read-vec vertex-data 3 pos)
+        (read-vec vertex-data 3 (+ 12 pos))
+        [(read-vec vertex-data 2 (+ 24 pos))
+         (read-vec vertex-data 2 (+ 32 pos))]]
+    44 [(read-vec vertex-data 3 pos)
+        (read-vec vertex-data 3 (+ 12 pos))
+        (read-color vertex-data (+ 24 pos))
+        [(read-vec vertex-data 2 (+ 28 pos))
+         (read-vec vertex-data 2 (+ 36 pos))]]
+    48 [(read-vec vertex-data 3 pos)
+        (read-vec vertex-data 3 (+ 12 pos))
+        [(read-vec vertex-data 2 (+ 24 pos))
+         (read-vec vertex-data 2 (+ 32 pos))
+         (read-vec vertex-data 2 (+ 40 pos))]]
+    52 [(read-vec vertex-data 3 pos)
+        (read-vec vertex-data 3 (+ 12 pos))
+        (read-color vertex-data (+ 24 pos))
+        [(read-vec vertex-data 2 (+ 28 pos))
+         (read-vec vertex-data 2 (+ 36 pos))
+         (read-vec vertex-data 2 (+ 44 pos))]]
+    56 [(read-vec vertex-data 3 pos)
+        (read-vec vertex-data 3 (+ 12 pos))
+        [(read-vec vertex-data 2 (+ 24 pos))
+         (read-vec vertex-data 2 (+ 32 pos))
+         (read-vec vertex-data 2 (+ 40 pos))
+         (read-vec vertex-data 2 (+ 48 pos))]]
+    60 [(read-vec vertex-data 3 pos)
+        (read-vec vertex-data 3 (+ 12 pos))
+        (read-color vertex-data (+ 24 pos))
+        [(read-vec vertex-data 2 (+ 28 pos))
+         (read-vec vertex-data 2 (+ 36 pos))
+         (read-vec vertex-data 2 (+ 44 pos))
+         (read-vec vertex-data 2 (+ 52 pos))]]
+    64 [(read-vec vertex-data 3 pos)
+        (read-vec vertex-data 3 (+ 12 pos))
+        [(read-vec vertex-data 2 (+ 24 pos))
+         (read-vec vertex-data 2 (+ 32 pos))
+         (read-vec vertex-data 2 (+ 40 pos))
+         (read-vec vertex-data 2 (+ 48 pos))
+         (read-vec vertex-data 2 (+ 56 pos))]]
+    68 [(read-vec vertex-data 3 pos)
+        (read-vec vertex-data 3 (+ 12 pos))
+        (read-color vertex-data (+ 24 pos))
+        [(read-vec vertex-data 2 (+ 28 pos))
+         (read-vec vertex-data 2 (+ 36 pos))
+         (read-vec vertex-data 2 (+ 44 pos))
+         (read-vec vertex-data 2 (+ 52 pos))
+         (read-vec vertex-data 2 (+ 56 pos))]]
+    72 [(read-vec vertex-data 3 pos)
+        (read-vec vertex-data 3 (+ 12 pos))
+        [(read-vec vertex-data 2 (+ 24 pos))
+         (read-vec vertex-data 2 (+ 32 pos))
+         (read-vec vertex-data 2 (+ 40 pos))
+         (read-vec vertex-data 2 (+ 48 pos))
+         (read-vec vertex-data 2 (+ 56 pos))
+         (read-vec vertex-data 2 (+ 64 pos))]]))
 
 (defn parse-vertices
   [vertex-data-node n]
@@ -139,11 +141,11 @@
 
 (defn parse-indices
   [{:keys [data size] :as vertex-index-node}]
-  (let [n (.getInt data)
+  (let [n (get-unsigned-int data)
         index-data-length (.capacity data)
-        bytes-per-index (/ (- size 4) n)]
-    (->> (iterate #(+ % bytes-per-index) 0)
-         (take-while #(< % index-data-length))
+        bytes-per-index (/ (- index-data-length 4) n)]
+    (assert (== (mod (- index-data-length 4) n) 0))
+    (->> (take n (iterate #(+ % bytes-per-index) 0))
          (pmap #(case bytes-per-index
                   2 (get-unsigned-short data %)
                   4 (get-unsigned-int data %)))
