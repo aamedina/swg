@@ -4,6 +4,10 @@
             [clojure.string :as str]
             [clojure.java.io :as io]))
 
+(def formatter (java.text.DecimalFormat. "###.###"))
+
+(def ^:const epsilon 2E-23)
+
 (defn format-floats
   [floats flip-z?]
   (->> (map (fn [[x y z]]
@@ -11,7 +15,7 @@
                 [x y (- z)]
                 [x y z])) floats)
        (reduce into [])
-       (map #(format "%.5f" %))
+       (map #(format "%g" (float %)))
        (str/join " ")))
 
 (defn format-texture-coords
@@ -22,7 +26,7 @@
                 [x (- 1.0 y)]
                 [x y])))
        (reduce into [])
-       (map #(format "%.5f" %))
+       (map #(format "%g" (float %)))
        (str/join " ")))
 
 (defn format-indices
@@ -87,27 +91,17 @@
                 :set "0"}]
        [:p (format-indices indices true)]]]]))
 
-(defn technique-common
-  [child]
-  (xml/element :technique_common {} child))
-
-(defn perspective
-  [yfov aspect-ratio znear zfar]
-  (xml/as-elements [:perspective
-                    [:yfov yfov]
-                    [:aspect_ratio aspect-ratio]
-                    [:znear znear]
-                    [:zfar zfar]]))
-
-(defn optics
-  []
-  (xml/element :optics {} (technique-common (perspective 37.8492 1.5 1 10000))))
-
 (defn camera
   [n]
-  (xml/element :camera {:id (str "cameraShape" n)
-                        :name (str "cameraShape" n)}
-               (optics)))
+  (xml/as-elements [:camera {:id (str "cameraShape" n)
+                             :name (str "cameraShape" n)}
+                    [:optics
+                     [:technique_common
+                      [:perspective
+                       [:yfov 37.8492]
+                       [:aspect_ratio 1.5]
+                       [:znear 1]
+                       [:zfar 10000]]]]]))
 
 (defn library-cameras
   []
@@ -117,7 +111,7 @@
   [n]
   (xml/as-elements [:light {:id (str "directionalLightShape" n "-lib")
                             :name (str "directionalLightShape" n)}
-                    [:technique-common
+                    [:technique_common
                      [:directional
                       [:color (str/join " " [1 1 1])]]]]))
 
@@ -128,12 +122,13 @@
 (defn library-images
   [shaders]
   (xml/as-elements [:library_images
-                    (for [[shader n] (->> (range (count shaders))
-                                          (interleave shaders)
-                                          (partition 2))
+                    (for [[{:keys [texture-file]} n]
+                          (->> (range (count shaders))
+                               (interleave shaders)
+                               (partition 2))
                           :let [id (str "Image" n)]]
-                      [:image {:id id :name id :depth "1"}
-                       [:init_from shader]])]))
+                      [:image {:id id :name id}
+                       [:init_from (str "./" texture-file)]])]))
 
 (defn library-materials
   [geometries]
@@ -151,15 +146,13 @@
                                 img (str "Image" n)]]
                       [:effect {:id id}
                        [:profile_COMMON
-                        [:new-param {:sid (str img "-surface")}
+                        [:newparam {:sid (str img "-surface")}
                          [:surface {:type "2D"}
                           [:init_from img]
                           [:format "A8R8G8B8"]]]
-                        [:new-param {:sid (str img "-sampler")}
+                        [:newparam {:sid (str img "-sampler")}
                          [:sampler2D
-                          [:source (str img "-surface")]
-                          [:minfilter "LINEAR_MIPMAP_LINEAR"]
-                          [:magfilter "LINEAR"]]]
+                          [:source (str img "-surface")]]]
                         [:technique {:sid "common"}
                          [:phong
                           [:emission [:color "0 0 0 1"]]
@@ -186,19 +179,20 @@
 (defn library-visual-scenes
   [geometries]
   (xml/as-elements [:library_visual_scenes
-                    (for [n (range (count geometries))
-                          :let [geometry-url (str "#meshGeometry" n)]]
-                      [:visual_scene {:id "VisualSceneNode"
-                                      :name "untitled"}
-                       [:node {:id "Mesh" :name "Mesh" :type "NODE"}
-                        [:matrix {:sid "transform"}
-                         "1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"]
-                        [:instance_geometry {:url geometry-url}
-                         [:bind_material
-                          [:technique_common
-                           [:instance_material
-                            {:symbol (str "meshGeometry" n "-material")
-                             :target (str "Material" n)}]]]]]])]))
+                    [:visual_scene {:id "VisualSceneNode" :name "untitled"}
+                       [:node {:id "SWGMesh" :name "SWGMesh" :type "NODE"}
+                        [:rotate {:sid "rotateZ"} "0 0 1 0"]
+                        [:rotate {:sid "rotateY"} "0 1 0 0"]
+                        [:rotate {:sid "rotateX"} "1 0 0 0"]
+                        (for [n (range (count geometries))
+                              :let [geometry-url (str "#meshGeometry" n)]]
+                          [:instance_geometry {:url geometry-url}
+                           [:bind_material
+                            [:technique_common
+                             [:instance_material
+                              {:symbol (str "meshGeometry" n "-material")
+                               :target (str "#Material" n)}
+                              ]]]])]]]))
 
 (defn scene
   []
@@ -212,7 +206,6 @@
                      [:authoring_tool "Unknown"]
                      [:comment "Clojure rules!"]
                      [:copyright "Copyright 2014 Sony Online Entertainment"]]
-                    [:unit {:meter "0.1.0" :name "centimeter"}]
                     [:up_axis "Y_UP"]]))
 
 (defn export-collada
@@ -231,5 +224,5 @@
 
 (def star-destroyer
   (let [xml (xml/indent-str (export-collada iff/test-iff))]
-    (spit "resources/meshes/star_destroyer.dae" xml)
+    (spit "resources/extracted/star_destroyer.dae" xml)
     xml))

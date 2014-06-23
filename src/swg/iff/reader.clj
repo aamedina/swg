@@ -3,10 +3,25 @@
             [clojure.tools.namespace.repl :refer [refresh-all]]
             [clojure.zip :as zip]
             [clojure.string :as str]
-            [clojure.core.reducers :as r])
+            [clojure.core.reducers :as r]
+            [clojure.java.shell :as sh])
   (:import (java.io RandomAccessFile)
            (java.nio ByteBuffer ByteOrder MappedByteBuffer)
            (java.nio.channels FileChannel FileChannel$MapMode)))
+
+(declare iff-buffer)
+
+(defn get-unsigned-byte
+  ([buf] (bit-and (.get buf) 0xff))
+  ([buf pos] (bit-and (.get buf pos) 0xff)))
+
+(defn get-unsigned-short
+  ([buf] (bit-and (.getShort buf) 0xffff))
+  ([buf pos] (bit-and (.getShort buf pos) 0xffff)))
+
+(defn get-unsigned-int
+  ([buf] (bit-and (.getInt buf) 0xffffffff))
+  ([buf pos] (bit-and (.getInt buf pos) 0xffffffff)))
 
 (defn iff-zipper
   [root]
@@ -51,7 +66,7 @@
         :texture-coords [(read-vec vertex-data 2 (+ 24 pos))]}
     36 {:position (read-vec vertex-data 3 pos)
         :normal (read-vec vertex-data 3 (+ 12 pos))
-        :color (into [] (map #(.get vertex-data %)
+        :color (into [] (map #(get-unsigned-byte vertex-data %)
                              (range (+ 24 pos) (+ 28 pos))))
         :texture-coords [(read-vec vertex-data 2 (+ 28 pos))]}
     ;; 40 {:position (read-vec vertex-data 3)
@@ -130,27 +145,47 @@
     (->> (iterate #(+ % bytes-per-index) 0)
          (take-while #(< % index-data-length))
          (pmap #(case bytes-per-index
-                  2 (.getShort data %)
-                  4 (.getInt data %)))
+                  2 (get-unsigned-short data %)
+                  4 (get-unsigned-int data %)))
          (into []))))
+
+(defn parse-shader
+  [path]
+  (let [shader (iff-buffer (str "resources/extracted/" path))
+        material-node (get-child shader "MATS")
+        first-child (first (:children material-node))
+        material-tag (-> (get-child first-child "TAG ")
+                         :data
+                         (parse-string 4))
+        {:keys [data] :as material-list} (get-child first-child "MATL")]
+    {:ambient (get-unsigned-byte data)
+     :diffuse (get-unsigned-byte data)
+     :specular (get-unsigned-byte data)
+     :emissive (get-unsigned-byte data)
+     :shininess (get-unsigned-byte data)
+     :texture-file (let [texture-node (-> (get-child shader "TXMS")
+                                          (get-child "TXM "))
+                         {:keys [data]} (get-child texture-node "NAME") ]
+                     (str/replace (parse-string data) #"\.dds" ".png"))}))
 
 (defn parse-geometry
   [root-geometry-node idx]
   (let [node (->> (:children root-geometry-node)
                   (filter #(= (:type %) (str "000" (inc idx))))
                   first)]
-    {:shader (parse-string (:data (get-child node "NAME")))
+    {:shader (parse-shader (parse-string (:data (get-child node "NAME"))))
      :vertices (parse-vertices (get-child node "DATA")
                                (-> (get-child node "VTXA")
                                    (get-child "INFO")
                                    (:data)
-                                   (.getInt 4)))
+                                   (get-unsigned-int 4)))
      :indices (parse-indices (get-child node "INDX"))}))
 
 (defn parse-mesh
   [root]
   (let [root-geometry-node (first (:children (get-child root "SPS ")))
-        geometry-count (.getInt (:data (get-child root-geometry-node "CNT ")))
+        geometry-count (get-unsigned-int
+                        (:data (get-child root-geometry-node "CNT ")))
         geometries (pmap #(parse-geometry root-geometry-node %)
                          (range geometry-count))]
     {:geometries (into [] geometries)}))
@@ -160,7 +195,7 @@
   (letfn [(reduce-children [max parent children]
             (if (< (.position buf) max)
               (let [tag (parse-string buf 4)
-                    size (.getInt (.order buf ByteOrder/BIG_ENDIAN))
+                    size (get-unsigned-int (.order buf ByteOrder/BIG_ENDIAN))
                     child (if (= tag "FORM")
                             {:tag :form
                              :parent parent
@@ -185,7 +220,7 @@
                                          parent children)))]
     (reduce str (map char (repeatedly 4 #(.get buf))))
     (parse-form-node {:tag :form
-                      :size (.getInt (.order buf ByteOrder/BIG_ENDIAN))
+                      :size (get-unsigned-int (.order buf ByteOrder/BIG_ENDIAN))
                       :type (parse-string buf 4)
                       :parent nil
                       :children []})))
@@ -202,3 +237,9 @@
 (def test-iff
   (let [path "resources/extracted/appearance/mesh/star_destroyer.msh"]
     (time (parse-mesh (iff-buffer path)))))
+
+
+
+
+
+
