@@ -190,7 +190,7 @@
                         (:data (get-child root-geometry-node "CNT ")))
         geometries (pmap #(parse-geometry root-geometry-node %)
                          (range geometry-count))]
-    {:geometries (into [] geometries)}))
+    (into [] geometries)))
 
 (defn parse-iff
   [buf]
@@ -239,9 +239,5 @@
 (def test-iff
   (let [path "resources/extracted/appearance/mesh/star_destroyer.msh"]
     (time (parse-mesh (iff-buffer path)))))
-
-
-
-
 
 

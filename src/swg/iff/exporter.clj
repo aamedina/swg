@@ -12,7 +12,7 @@
               (if flip-z?
                 [x y (- z)]
                 [x y z])) floats)
-       (map #(format "%g" (float %)))
+       (map #(format "%g" %))
        (str/join " ")))
 
 (defn format-texture-coords
@@ -22,7 +22,7 @@
               (if flip-v?
                 [x (- 1.0 y)]
                 [x y])))
-       (map #(format "%g" (float %)))
+       (map #(format "%g" %))
        (str/join " ")))
 
 (defn format-indices
@@ -35,8 +35,9 @@
 
 (defn geometry
   [idx {:keys [shader vertices indices] :as geometry}]
-  (let [id (str "meshGeometry" idx)]
-    [:geometry {:id id :name id}
+  (let [id (str "shape" idx "-lib")
+        name (str "shape" idx)]
+    [:geometry {:id id :name name}
      [:mesh
       [:source {:id (str id "-positions") :name "position"}
        [:float_array {:id (str id "-positions-array")
@@ -60,30 +61,30 @@
          [:param {:name "X" :type "float"}]
          [:param {:name "Y" :type "float"}]
          [:param {:name "Z" :type "float"}]]]]
-      [:source {:id (str id "-maps") :name "map"}
-       [:float_array {:id (str id "-maps-array")
+      [:source {:id (str id "-map") :name "map"}
+       [:float_array {:id (str id "-map-array")
                       :count (* (count vertices) 2)}
         (format-texture-coords (map last vertices) 0 true)]
        [:technique_common
-        [:accessor {:source (str "#" id "-maps-array")
+        [:accessor {:source (str "#" id "-map-array")
                     :count (count vertices)
                     :stride 2}
          [:param {:name "S" :type "float"}]
          [:param {:name "T" :type "float"}]]]]
       [:vertices {:id (str id "-vertices")}
        [:input {:semantic "POSITION" :source (str "#" id "-positions")}]]
-      [:triangles {:material (str id "-material")
+      [:triangles {:material (str "material" idx)
                    :count (/ (count indices) 3)}
        [:input {:semantic "VERTEX"
                 :source (str "#" id "-vertices")
                 :offset "0"}]
        [:input {:semantic "NORMAL"
                 :source (str "#" id "-normals")
-                :offset "0"}]
+                :offset "1"}]
        [:input {:semantic "TEXCOORD"
-                :source (str "#" id "-maps")
-                :offset "0"}]
-       [:p (format-indices indices true)]]]]))
+                :source (str "#" id "-map")
+                :offset "2"}]
+       [:p (format-indices indices false)]]]]))
 
 (defn camera
   [n]
@@ -120,7 +121,7 @@
                           (->> (range (count shaders))
                                (interleave shaders)
                                (partition 2))
-                          :let [id (str "Image" n)]]
+                          :let [id (str "texture" n)]]
                       [:image {:id id :name id}
                        [:init_from texture-file]])]))
 
@@ -128,16 +129,16 @@
   [geometries]
   (xml/as-elements [:library_materials
                     (for [n (range (count geometries))
-                          :let [id (str "Material" n)]]
+                          :let [id (str "material" n)]]
                       [:material {:id id :name id}
-                       [:instance_effect {:url (str "#Effect" n)}]])]))
+                       [:instance_effect {:url (str "#" id "-fx")}]])]))
 
 (defn library-effects
   [geometries]
   (xml/as-elements [:library_effects
                     (for [n (range (count geometries))
-                          :let [id (str "Effect" n)
-                                img (str "Image" n)]]
+                          :let [id (str "material" n "-fx")
+                                img (str "texture" n)]]
                       [:effect {:id id}
                        [:profile_COMMON
                         [:newparam {:sid (str img "-surface")}
@@ -145,9 +146,10 @@
                           [:init_from img]
                           [:format "A8R8G8B8"]]]
                         [:newparam {:sid (str img "-sampler")}
-                         [:sampler2D [:source (str img "-surface")]]]
+                         [:sampler2D
+                          [:source (str img "-surface")]]]
                         [:technique {:sid "common"}
-                         [:phong
+                         [:blinn
                           [:emission [:color "0 0 0 1"]]
                           [:ambient [:color "0 0 0 1"]]
                           [:diffuse [:texture {:texture (str img "-sampler")
@@ -157,8 +159,7 @@
                           [:reflective [:color "0 0 0 1"]]
                           [:reflectivity [:float 0.5]]
                           [:transparent {:opaque "RGB_ZERO"} [:color "0 0 0 1"]]
-                          [:transparency [:float 1]]
-                          [:index_of_refraction [:float "1"]]]]]])]))
+                          [:transparency [:float 1]]]]]])]))
 
 (defn library-geometries
   [geometries]
@@ -173,19 +174,23 @@
   [geometries]
   (xml/as-elements [:library_visual_scenes
                     [:visual_scene {:id "VisualSceneNode" :name "untitled"}
-                       [:node {:id "SWGMesh" :name "SWGMesh" :type "NODE"}
-                        [:rotate {:sid "rotateZ"} "0 0 1 0"]
-                        [:rotate {:sid "rotateY"} "0 1 0 0"]
-                        [:rotate {:sid "rotateX"} "1 0 0 0"]
-                        (for [n (range (count geometries))
-                              :let [geometry-url (str "#meshGeometry" n)]]
-                          [:instance_geometry {:url geometry-url}
-                           [:bind_material
-                            [:technique_common
-                             [:instance_material
-                              {:symbol (str "meshGeometry" n "-material")
-                               :target (str "#Material" n)}
-                              ]]]])]]]))
+                     [:node {:id "SWGMesh" :name "SWGMesh"}
+                      [:matrix {:sid "transform"}
+                       "1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"]
+                      ;; [:rotate {:sid "rotateZ"} "0 0 1 0"]
+                      ;; [:rotate {:sid "rotateY"} "0 1 0 0"]
+                      ;; [:rotate {:sid "rotateX"} "1 0 0 0"]
+                      (for [n (range (count geometries))
+                            :let [geometry-url (str "#shape" n "-lib")]]
+                        [:instance_geometry {:url geometry-url}
+                         [:bind_material
+                          [:technique_common
+                           [:instance_material
+                            {:symbol (str "material" n)
+                             :target (str "#material" n)}
+                            [:bind_vertex_input {:semantic "TEX0"
+                                                 :input_semantic "TEXCOORD"
+                                                 :input_set 0}]]]]])]]]))
 
 (defn scene
   []
@@ -197,8 +202,9 @@
                     [:contributor
                      [:author "Sony Online Entertainment"]
                      [:authoring_tool "Unknown"]
-                     [:comment "Clojure rules!"]
                      [:copyright "Copyright 2014 Sony Online Entertainment"]]
+                    [:created "2006-08-23T22:29:59Z"]
+                    [:modified "2006-08-23T22:29:59Z"]
                     [:up_axis "Y_UP"]]))
 
 (defn export-collada
@@ -208,12 +214,25 @@
                (asset)
                #_(library-cameras)
                #_(library-lights)
-               (library-images (map :shader (:geometries mesh)))
-               (library-materials (:geometries mesh))
-               (library-effects (:geometries mesh))
-               (library-geometries (:geometries mesh))
-               (library-visual-scenes (:geometries mesh))
+               (library-images (map :shader mesh))
+               (library-materials mesh)
+               (library-effects mesh)
+               (library-geometries mesh)
+               (library-visual-scenes mesh)
                (scene)))
+
+(defn export-mesh
+  [inpath outpath]
+  (let [mesh (iff/parse-mesh (iff/iff-buffer inpath))
+        xml (xml/indent-str (export-collada mesh))]
+    (spit outpath xml)))
+
+(comment
+  (let [buf (iff/iff-buffer "resources/extracted/appearance/mesh/thm_nboo_thed_theed_palace_r0_mesh_l0_c0_l0.msh")
+        mesh (iff/parse-mesh buf)]
+    mesh)
+  (export-mesh 
+               "resources/extracted/thm_nboo_thed_theed_palace_r0_mesh_l0_c0_l0.dae"))
 
 (def star-destroyer
   (let [xml (xml/indent-str (export-collada iff/test-iff))]
