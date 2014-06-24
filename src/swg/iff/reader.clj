@@ -3,7 +3,6 @@
             [clojure.tools.namespace.repl :refer [refresh-all]]
             [clojure.zip :as zip]
             [clojure.string :as str]
-            [clojure.core.reducers :as r]
             [clojure.java.shell :as sh])
   (:import (java.io RandomAccessFile)
            (java.nio ByteBuffer ByteOrder MappedByteBuffer)
@@ -11,17 +10,44 @@
 
 (declare iff-buffer)
 
-(defn get-unsigned-byte
+(defrecord Form [size type children])
+(defrecord Record [size type data])
+
+
+(defn get-ubyte
   ([buf] (bit-and (.get buf) 0xff))
   ([buf pos] (bit-and (.get buf pos) 0xff)))
 
-(defn get-unsigned-short
+(defn get-ushort
   ([buf] (bit-and (.getShort buf) 0xffff))
   ([buf pos] (bit-and (.getShort buf pos) 0xffff)))
 
-(defn get-unsigned-int
-  ([buf] (bit-and (.getInt buf) 0xffffffff))
-  ([buf pos] (bit-and (.getInt buf pos) 0xffffffff)))
+(defn get-uint
+  ([buf] (get-uint buf (.position buf)))
+  ([buf pos]
+     (let [nbuf (.duplicate buf)
+           ret (-> (.getInt (.order nbuf  ByteOrder/BIG_ENDIAN) pos)
+                   (bit-and 0xffffffff))]
+       (.position buf (.position nbuf))
+       ret)))
+
+(defn get-string
+  [buf n pos]
+  (apply str (map #(char (.get buf %)) (range pos (+ pos n)))))
+
+(defn byte-buffer
+  [path]
+  (with-open [in (RandomAccessFile. (io/file path) "r")
+              ch (.getChannel in)]
+    (doto (.map ch FileChannel$MapMode/READ_ONLY 0 (.size ch))
+      (.order ByteOrder/LITTLE_ENDIAN))))
+
+(defn read-bytes
+  [buf pos size]
+  (let [dest (byte-array size)
+        buf (.position (.duplicate buf) (+ 8 pos))]
+    (.get buf dest)
+    (ByteBuffer/wrap dest)))
 
 (defn iff-zipper
   [root]
@@ -60,7 +86,7 @@
 
 (defn read-color
   [buf pos]
-  (mapv #(get-unsigned-byte buf %) (range pos (+ 4 pos))))
+  (mapv #(get-ubyte buf %) (range pos (+ 4 pos))))
 
 (defn parse-vertex
   [vertex-data bytes-per-vertex pos]
@@ -141,33 +167,33 @@
 
 (defn parse-indices
   [{:keys [data size] :as vertex-index-node}]
-  (let [n (get-unsigned-int data)
+  (let [n (get-uint data)
         index-data-length (.capacity data)
         bytes-per-index (/ (- index-data-length 4) n)]
     (assert (== (mod (- index-data-length 4) n) 0))
     (->> (take n (iterate #(+ % bytes-per-index) 0))
          (pmap #(case bytes-per-index
-                  2 (get-unsigned-short data %)
-                  4 (get-unsigned-int data %)))
+                  2 (get-ushort data %)
+                  4 (get-uint data %)))
          (into []))))
 
 (defn parse-shader
   [path]
-  (let [shader (iff-buffer (str "resources/extracted/" path))
+  (let [shader (iff-buffer (str "resources/extracted_jtl/" path))
         material-node (get-child shader "MATS")
         first-child (first (:children material-node))
         material-tag (-> (get-child first-child "TAG ")
                          :data
                          (parse-string 4))
         {:keys [data] :as material-list} (get-child first-child "MATL")]
-    {:ambient (get-unsigned-byte data)
-     :diffuse (get-unsigned-byte data)
-     :specular (get-unsigned-byte data)
-     :emissive (get-unsigned-byte data)
-     :shininess (get-unsigned-byte data)
+    {:ambient (get-ubyte data)
+     :diffuse (get-ubyte data)
+     :specular (get-ubyte data)
+     :emissive (get-ubyte data)
+     :shininess (get-ubyte data)
      :texture-file (let [texture-node (-> (get-child shader "TXMS")
                                           (get-child "TXM "))
-                         {:keys [data]} (get-child texture-node "NAME") ]
+                         {:keys [data]} (get-child texture-node "NAME")]
                      (str/replace (parse-string data) #"\.dds" ".png"))}))
 
 (defn parse-geometry
@@ -180,24 +206,31 @@
                                (-> (get-child node "VTXA")
                                    (get-child "INFO")
                                    (:data)
-                                   (get-unsigned-int 4)))
+                                   (get-uint 4)))
      :indices (parse-indices (get-child node "INDX"))}))
 
 (defn parse-mesh
   [root]
   (let [root-geometry-node (first (:children (get-child root "SPS ")))
-        geometry-count (get-unsigned-int
-                        (:data (get-child root-geometry-node "CNT ")))
-        geometries (pmap #(parse-geometry root-geometry-node %)
-                         (range geometry-count))]
-    (into [] geometries)))
+        geometry-count (-> (:data (get-child root-geometry-node "CNT "))
+                           (get-uint))]
+    (mapv #(parse-geometry root-geometry-node %)
+          (range geometry-count))))
+
+;; (defn read-form
+;;   [buf]
+;;   (let [tag (get-string buf 4)
+;;         size (get-uint buf)]
+;;     (if (= tag "FORM")
+;;       (Form. size (get-string buf 4 (+ 8 pos)) [])
+;;       (Record. size tag (read-bytes buf (+ 8 pos) size)))))
 
 (defn parse-iff
   [buf]
   (letfn [(reduce-children [max parent children]
             (if (< (.position buf) max)
               (let [tag (parse-string buf 4)
-                    size (get-unsigned-int (.order buf ByteOrder/BIG_ENDIAN))
+                    size (get-uint buf)
                     child (if (= tag "FORM")
                             {:tag :form
                              :parent parent
@@ -220,9 +253,8 @@
             (assoc parent
               :children (reduce-children (+ (.position buf) (- size 4))
                                          parent children)))]
-    (reduce str (map char (repeatedly 4 #(.get buf))))
     (parse-form-node {:tag :form
-                      :size (get-unsigned-int (.order buf ByteOrder/BIG_ENDIAN))
+                      :size (get-uint buf)
                       :type (parse-string buf 4)
                       :parent nil
                       :children []})))
@@ -236,8 +268,13 @@
                 (.order ByteOrder/LITTLE_ENDIAN)))]
     (parse-iff buf)))
 
-(def test-iff
-  (let [path "resources/extracted/appearance/mesh/star_destroyer.msh"]
-    (time (parse-mesh (iff-buffer path)))))
+;; (def star-destroyer
+;;   (-> "resources/extracted/appearance/mesh/star_destroyer.msh"
+;;       (iff-buffer)
+;;       (parse-mesh)
+;;       (time)))
 
-
+;; (def yt1300
+;;   (-> (iff-buffer "resources/extracted_jtl/appearance/mesh/yt1300_l0.msh")
+;;       (parse-mesh)
+;;       (time)))

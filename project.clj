@@ -17,7 +17,10 @@
                  [clojurewerkz/buffy "1.0.0-beta4"]
                  [com.stuartsierra/component "0.2.1"]
                  [com.jcraft/jzlib "1.1.3"]
-                 [gloss "0.2.2"]
+                 [net.mikera/vectorz-clj "0.22.0"]
+                 [byte-streams "0.1.11"]
+                 [byte-transforms "0.1.3"]
+                 [hiccup "1.0.5"]
                  [criterium "0.4.3"]]
   :main ^:skip-aot swg.core
   :target-path "target/%s"

@@ -6,13 +6,20 @@
 
 (def ^:const epsilon 2E-23)
 
+(defn collada-float
+  [n]
+  (let [flt (with-precision 6 (/ (bigdec n) 1))]
+    (if (> (.scale flt) 6)
+      (str (.setScale flt 6 java.math.RoundingMode/UP))
+      (str flt))))
+
 (defn format-floats
   [floats flip-z?]
   (->> (mapcat (fn [[x y z]]
               (if flip-z?
                 [x y (- z)]
                 [x y z])) floats)
-       (map #(format "%g" %))
+       (map collada-float)
        (str/join " ")))
 
 (defn format-texture-coords
@@ -22,7 +29,7 @@
               (if flip-v?
                 [x (- 1.0 y)]
                 [x y])))
-       (map #(format "%g" %))
+       (map collada-float)
        (str/join " ")))
 
 (defn format-indices
@@ -234,7 +241,7 @@
   (export-mesh 
                "resources/extracted/thm_nboo_thed_theed_palace_r0_mesh_l0_c0_l0.dae"))
 
-(def star-destroyer
-  (let [xml (xml/indent-str (export-collada iff/test-iff))]
-    (spit "resources/extracted/star_destroyer.dae" xml)
-    xml))
+;; (def star-destroyer
+;;   (let [xml (xml/indent-str (export-collada iff/star-destroyer))]
+;;     (spit "resources/extracted/star_destroyer.dae" xml)
+;;     xml))
