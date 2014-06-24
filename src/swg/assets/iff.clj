@@ -36,10 +36,14 @@
         (assoc parent :children children)))))
 
 (defn load-iff-file
-  [path]
-  (let [buf (byte-buffer path)
-        header (read-form buf)]
-    (load-children buf header)))
+  ([path]
+     (let [buf (byte-buffer path)
+           header (read-form buf)]
+       (load-children buf header)))
+  ([prefix-path path-to-file]
+     (let [buf (byte-buffer (str prefix-path "/" path-to-file))
+           header (read-form buf)]
+       (load-children buf header))))
 
 (def yt1300
   (-> "resources/extracted_jtl/appearance/mesh/yt1300_l0.msh"

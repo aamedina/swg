@@ -1,17 +1,15 @@
 (ns swg.assets.mesh
-  (:use clojure.core.matrix)
   (:require [clojure.tools.namespace.repl :refer [refresh-all]]
             [clojure.java.io :as io]
             [criterium.core :refer [quick-bench]]
             [swg.assets.iff :as iff :refer [load-node]]
             [swg.assets.util :refer :all :exclude [record?]]
+            [swg.assets.shader :as shader]
             [clojure.string :as str]
             [clojure.core.reducers :as r])
   (:import (java.io File RandomAccessFile)
            (java.nio ByteBuffer ByteOrder MappedByteBuffer)
            (java.nio.channels FileChannel FileChannel$MapMode)))
-
-(set-current-implementation :vectorz)
 
 (defmethod load-node "NAME"
   [{:keys [size data] :as node}]
@@ -24,80 +22,85 @@
     8 [(.getInt data) (.getInt data)]
     (.getInt data)))
 
-(defn read-vec
-  [buf n pos]
-  (mapv #(get-float buf %) (range pos (+ pos (* n 4)) 4)))
+(defn read-vec2
+  [buf pos]
+  [(get-float buf pos) (get-float buf (+ pos 4))])
+
+(defn read-vec3
+  [buf pos]
+  [(get-float buf pos) (get-float buf (+ pos 4)) (get-float buf (+ pos 8))])
 
 (defn read-color
   [buf pos]
-  (mapv #(get-ubyte buf %) (range pos (+ 4 pos))))
+  [(get-ubyte buf pos) (get-ubyte buf (+ pos 1))
+   (get-ubyte buf (+ pos 2)) (get-ubyte buf (+ pos 3))])
 
 (defn read-vertex
   [vertex-data bpv pos]
   (case bpv
-    32 [(read-vec vertex-data 3 pos)
-        (read-vec vertex-data 3 (+ 12 pos))
-        [(read-vec vertex-data 2 (+ 24 pos))]]
-    36 [(read-vec vertex-data 3 pos)
-        (read-vec vertex-data 3 (+ 12 pos))
+    32 [(read-vec3 vertex-data pos)
+        (read-vec3 vertex-data (+ 12 pos))
+        [(read-vec2 vertex-data (+ 24 pos))]]
+    36 [(read-vec3 vertex-data pos)
+        (read-vec3 vertex-data (+ 12 pos))
         (read-color vertex-data (+ 24 pos))
-        [(read-vec vertex-data 2 (+ 28 pos))]]
-    40 [(read-vec vertex-data 3 pos)
-        (read-vec vertex-data 3 (+ 12 pos))
-        [(read-vec vertex-data 2 (+ 24 pos))
-         (read-vec vertex-data 2 (+ 32 pos))]]
-    44 [(read-vec vertex-data 3 pos)
-        (read-vec vertex-data 3 (+ 12 pos))
+        [(read-vec2 vertex-data (+ 28 pos))]]
+    40 [(read-vec3 vertex-data pos)
+        (read-vec3 vertex-data (+ 12 pos))
+        [(read-vec2 vertex-data (+ 24 pos))
+         (read-vec2 vertex-data (+ 32 pos))]]
+    44 [(read-vec3 vertex-data pos)
+        (read-vec3 vertex-data (+ 12 pos))
         (read-color vertex-data (+ 24 pos))
-        [(read-vec vertex-data 2 (+ 28 pos))
-         (read-vec vertex-data 2 (+ 36 pos))]]
-    48 [(read-vec vertex-data 3 pos)
-        (read-vec vertex-data 3 (+ 12 pos))
-        [(read-vec vertex-data 2 (+ 24 pos))
-         (read-vec vertex-data 2 (+ 32 pos))
-         (read-vec vertex-data 2 (+ 40 pos))]]
-    52 [(read-vec vertex-data 3 pos)
-        (read-vec vertex-data 3 (+ 12 pos))
+        [(read-vec2 vertex-data (+ 28 pos))
+         (read-vec2 vertex-data (+ 36 pos))]]
+    48 [(read-vec3 vertex-data pos)
+        (read-vec3 vertex-data (+ 12 pos))
+        [(read-vec2 vertex-data (+ 24 pos))
+         (read-vec2 vertex-data (+ 32 pos))
+         (read-vec2 vertex-data (+ 40 pos))]]
+    52 [(read-vec3 vertex-data pos)
+        (read-vec3 vertex-data (+ 12 pos))
         (read-color vertex-data (+ 24 pos))
-        [(read-vec vertex-data 2 (+ 28 pos))
-         (read-vec vertex-data 2 (+ 36 pos))
-         (read-vec vertex-data 2 (+ 44 pos))]]
-    56 [(read-vec vertex-data 3 pos)
-        (read-vec vertex-data 3 (+ 12 pos))
-        [(read-vec vertex-data 2 (+ 24 pos))
-         (read-vec vertex-data 2 (+ 32 pos))
-         (read-vec vertex-data 2 (+ 40 pos))
-         (read-vec vertex-data 2 (+ 48 pos))]]
-    60 [(read-vec vertex-data 3 pos)
-        (read-vec vertex-data 3 (+ 12 pos))
+        [(read-vec2 vertex-data (+ 28 pos))
+         (read-vec2 vertex-data (+ 36 pos))
+         (read-vec2 vertex-data (+ 44 pos))]]
+    56 [(read-vec3 vertex-data pos)
+        (read-vec3 vertex-data (+ 12 pos))
+        [(read-vec2 vertex-data (+ 24 pos))
+         (read-vec2 vertex-data (+ 32 pos))
+         (read-vec2 vertex-data (+ 40 pos))
+         (read-vec2 vertex-data (+ 48 pos))]]
+    60 [(read-vec3 vertex-data pos)
+        (read-vec3 vertex-data (+ 12 pos))
         (read-color vertex-data (+ 24 pos))
-        [(read-vec vertex-data 2 (+ 28 pos))
-         (read-vec vertex-data 2 (+ 36 pos))
-         (read-vec vertex-data 2 (+ 44 pos))
-         (read-vec vertex-data 2 (+ 52 pos))]]
-    64 [(read-vec vertex-data 3 pos)
-        (read-vec vertex-data 3 (+ 12 pos))
-        [(read-vec vertex-data 2 (+ 24 pos))
-         (read-vec vertex-data 2 (+ 32 pos))
-         (read-vec vertex-data 2 (+ 40 pos))
-         (read-vec vertex-data 2 (+ 48 pos))
-         (read-vec vertex-data 2 (+ 56 pos))]]
-    68 [(read-vec vertex-data 3 pos)
-        (read-vec vertex-data 3 (+ 12 pos))
+        [(read-vec2 vertex-data (+ 28 pos))
+         (read-vec2 vertex-data (+ 36 pos))
+         (read-vec2 vertex-data (+ 44 pos))
+         (read-vec2 vertex-data (+ 52 pos))]]
+    64 [(read-vec3 vertex-data pos)
+        (read-vec3 vertex-data (+ 12 pos))
+        [(read-vec2 vertex-data (+ 24 pos))
+         (read-vec2 vertex-data (+ 32 pos))
+         (read-vec2 vertex-data (+ 40 pos))
+         (read-vec2 vertex-data (+ 48 pos))
+         (read-vec2 vertex-data (+ 56 pos))]]
+    68 [(read-vec3 vertex-data pos)
+        (read-vec3 vertex-data (+ 12 pos))
         (read-color vertex-data (+ 24 pos))
-        [(read-vec vertex-data 2 (+ 28 pos))
-         (read-vec vertex-data 2 (+ 36 pos))
-         (read-vec vertex-data 2 (+ 44 pos))
-         (read-vec vertex-data 2 (+ 52 pos))
-         (read-vec vertex-data 2 (+ 56 pos))]]
-    72 [(read-vec vertex-data 3 pos)
-        (read-vec vertex-data 3 (+ 12 pos))
-        [(read-vec vertex-data 2 (+ 24 pos))
-         (read-vec vertex-data 2 (+ 32 pos))
-         (read-vec vertex-data 2 (+ 40 pos))
-         (read-vec vertex-data 2 (+ 48 pos))
-         (read-vec vertex-data 2 (+ 56 pos))
-         (read-vec vertex-data 2 (+ 64 pos))]]))
+        [(read-vec2 vertex-data (+ 28 pos))
+         (read-vec2 vertex-data (+ 36 pos))
+         (read-vec2 vertex-data (+ 44 pos))
+         (read-vec2 vertex-data (+ 52 pos))
+         (read-vec2 vertex-data (+ 56 pos))]]
+    72 [(read-vec3 vertex-data pos)
+        (read-vec3 vertex-data (+ 12 pos))
+        [(read-vec2 vertex-data (+ 24 pos))
+         (read-vec2 vertex-data (+ 32 pos))
+         (read-vec2 vertex-data (+ 40 pos))
+         (read-vec2 vertex-data (+ 48 pos))
+         (read-vec2 vertex-data (+ 56 pos))
+         (read-vec2 vertex-data (+ 64 pos))]]))
 
 (defmethod load-node "VTXA"
   [{:keys [data size children]}]
@@ -113,44 +116,52 @@
   [{:keys [data size children]}]
   (let [index-count (.getInt data)
         bpi (/ (- size 4) index-count)
-        indices (r/map (fn [pos]
+        indices (pmap (fn [pos]
                         (case bpi
                           2 (.getShort data pos)
                           4 (.getInt data pos)))
-                       (range 0 (* index-count bpi) bpi))]
+                      (range 0 (* index-count bpi) bpi))]
     (into [] indices)))
 
 (defmethod load-node "SIDX"
   [{:keys [data size bpi children]}]
-  (reduce (fn [sets pos]
-            (let [rotations [(get-float data) (get-float data) (get-float data)]
-                  num-indices (.getInt data)]
-              (conj sets {:rotations rotations
-                          :indices
-                          (reduce (fn [indices pos]
-                                    (conj indices (case bpi
-                                                    2 (.getShort data)
-                                                    4 (.getInt data))))
-                                  [] (range 0 (* num-indices bpi) bpi))})))
-          [] (range 0 (.getInt data))))
+  (r/reduce (fn [sets pos]
+              (let [rotations [(get-float data)
+                               (get-float data)
+                               (get-float data)]
+                  num-indices (.getInt data)
+                  indices (r/reduce (fn [indices pos]
+                                      (conj indices (case bpi
+                                                      2 (.getShort data)
+                                                      4 (.getInt data))))
+                                    [] (range 0 (* num-indices bpi) bpi))]
+              (conj sets {:rotations rotations :indices indices})))
+          [] (range (.getInt data))))
+
+(defn load-geometry-node
+  [geometry-node]
+  (let [[sht-node _ vnode] (:children geometry-node)
+        sht-file (load-node sht-node)
+        [info vtxa indx sidx] (:children vnode)
+        vertices (load-node vtxa)
+        indices (load-node indx)
+        bpi (if (instance? java.lang.Short (first indices)) 2 4)
+        secondary (when sidx (load-node (assoc sidx :bpi bpi)))]
+    (cond-> {:texture sht-file
+             :vertices vertices
+             :indices indices}
+      secondary (assoc :secondary secondary))))
 
 (defmethod load-node "MESH"
   [node]
   (let [root (first (:children (find-child node #(= (:type %) "SPS "))))
         [cnt-node & geometry-nodes] (:children root)
-        cnt (.getInt (:data cnt-node))]
-    (reduce (fn [geometries geometry-node]
-              (let [[sht-node _ vnode] (:children geometry-node)
-                    sht-file (load-node sht-node)
-                    [info vtxa indx sidx] (:children vnode)
-                    vertices (load-node vtxa)
-                    indices (load-node indx)
-                    bpi (if (instance? java.lang.Short (first indices)) 2 4)
-                    secondary (when sidx (load-node (assoc sidx :bpi bpi)))]
-                (conj geometries (cond-> {:vertices vertices
-                                          :indices indices}
-                                   secondary (assoc :secondary secondary)))))
-            [] geometry-nodes)))
+        cnt (.getInt (:data cnt-node))
+        geometries (if (>= (count geometry-nodes)
+                           (.availableProcessors (Runtime/getRuntime)))
+                     (pmap load-geometry-node geometry-nodes)
+                     (r/map load-geometry-node geometry-nodes))]
+    (into [] geometries)))
 
 (def yt1300
   (-> "resources/extracted_jtl/appearance/mesh/yt1300_l0.msh" iff/load-iff-file load-node time))
