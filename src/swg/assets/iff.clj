@@ -10,6 +10,8 @@
 
 (set-current-implementation :vectorz)
 
+(def ^:dynamic *prefix-path* "resources/extracted")
+
 (defmulti load-node :type)
 
 (defmethod load-node :default

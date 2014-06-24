@@ -147,7 +147,7 @@
         indices (load-node indx)
         bpi (if (instance? java.lang.Short (first indices)) 2 4)
         secondary (when sidx (load-node (assoc sidx :bpi bpi)))]
-    (cond-> {:texture sht-file
+    (cond-> {:texture (load-node (iff/load-iff-file iff/*prefix-path* sht-file))
              :vertices vertices
              :indices indices}
       secondary (assoc :secondary secondary))))
@@ -164,7 +164,11 @@
     (into [] geometries)))
 
 (def yt1300
-  (-> "resources/extracted_jtl/appearance/mesh/yt1300_l0.msh" iff/load-iff-file load-node time))
+  (binding [iff/*prefix-path* "resources/extracted_jtl"]
+    (-> "resources/extracted_jtl/appearance/mesh/yt1300_l0.msh"
+        iff/load-iff-file
+        load-node
+        time)))
 
 (def star-destroyer
   (-> "resources/extracted/appearance/mesh/star_destroyer.msh" iff/load-iff-file load-node time))

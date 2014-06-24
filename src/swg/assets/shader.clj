@@ -14,13 +14,36 @@
   [node]
   node)
 
+(defmethod load-node "TAG "
+  [{:keys [data]}]
+  (get-string data 4))
+
+(defn read-color
+  [buf]
+  (mapv get-float (repeat 4 buf)))
+
+(defmethod load-node "MATL"
+  [{:keys [data]}]
+  {:ambient (read-color data)
+   :diffuse (read-color data)
+   :specular (read-color data)
+   :emissive (read-color data)
+   :shininess (get-float data)})
+
 (defmethod load-node "SSHT"
-  [{:keys [children] :as node}]
-  node)
+  [{:keys [type children] :as node}]
+  (let [mats (find-child node #(= (:type %) "MATS"))
+        tag (load-node (find-child node #(= (:type %) "TAG ")))
+        colors (load-node (find-child node #(= (:type %) "MATL")))
+        texture (find-child node #(= (:type %) "NAME"))
+        texture-file (-> (get-string (:data texture) (dec (:size texture)))
+                         (str/replace #"dds$" "png"))]
+    (assoc colors
+      :texture texture-file)))
 
 (defmethod load-node "CSHD"
-  [{:keys [children] :as node}]
-  node)
+  [{:keys [type children] :as node}]
+  type)
 
 (def yt1300
   (->> (map (partial iff/load-iff-file "resources/extracted_jtl")
