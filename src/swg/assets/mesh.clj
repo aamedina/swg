@@ -122,12 +122,17 @@
 
 (defmethod load-node "SIDX"
   [{:keys [data size bpi children]}]
-  (let [num-sets (.getInt data)]
-    (reduce (fn [sets pos]
-              (conj sets [(read-vec data 3 pos)
-                          (.getInt data)
-                          (.getShort data)]))
-            [] (range 0 (* num-sets bpi) bpi))))
+  (reduce (fn [sets pos]
+            (let [rotations [(get-float data) (get-float data) (get-float data)]
+                  num-indices (.getInt data)]
+              (conj sets {:rotations rotations
+                          :indices
+                          (reduce (fn [indices pos]
+                                    (conj indices (case bpi
+                                                    2 (.getShort data)
+                                                    4 (.getInt data))))
+                                  [] (range 0 (* num-indices bpi) bpi))})))
+          [] (range 0 (.getInt data))))
 
 (defmethod load-node "MESH"
   [node]

@@ -43,14 +43,22 @@
                               nodes)))))
 
 (defn get-float
-  [buf pos]
-  (let [flt (with-precision 6 (/ (bigdec (.getFloat buf pos)) 1))]
-    (cond 
-      (> (.scale flt) 6) (.setScale flt 6 java.math.RoundingMode/UP)
-      (zero? flt) 0
-      (== -1.0M flt) -1
-      (== 1.0M flt) 1
-      :else flt)))
+  ([buf]
+     (let [flt (with-precision 6 (/ (bigdec (.getFloat buf)) 1))]
+       (cond 
+         (> (.scale flt) 6) (.setScale flt 6 java.math.RoundingMode/UP)
+         (zero? flt) 0
+         (== -1.0M flt) -1
+         (== 1.0M flt) 1
+         :else flt)))
+  ([buf pos]
+     (let [flt (with-precision 6 (/ (bigdec (.getFloat buf pos)) 1))]
+       (cond 
+         (> (.scale flt) 6) (.setScale flt 6 java.math.RoundingMode/UP)
+         (zero? flt) 0
+         (== -1.0M flt) -1
+         (== 1.0M flt) 1
+         :else flt))))
 
 (defn get-ubyte
   ([buf] (bit-and (.get buf) 0xff))
