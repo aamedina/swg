@@ -1,10 +1,46 @@
 (ns swg.assets.util
+  (:refer-clojure :exclude [record?])
   (:require [clojure.tools.namespace.repl :refer [refresh-all]]
             [clojure.java.io :as io]
-            [criterium.core :refer [quick-bench]])
+            [criterium.core :refer [quick-bench]]
+            [clojure.zip :as zip])
   (:import (java.io File RandomAccessFile)
            (java.nio ByteBuffer ByteOrder MappedByteBuffer)
            (java.nio.channels FileChannel FileChannel$MapMode)))
+
+(defn form?
+  [x]
+  (and (map? x) (contains? x :children)))
+
+(defn record?
+  [x]
+  (and (map? x) (contains? x :data)))
+
+(defn iff-zipper
+  [root]
+  (zip/zipper form?
+              (comp seq :children)
+              (fn [node children]
+                (assoc node :children (and children (apply vector children))))
+              root))
+
+(defn find-child
+  [root pred]
+  (loop [loc (iff-zipper root)]
+    (if-let [node (when (pred (zip/node loc))
+                    (zip/node loc))]
+      node
+      (when-not (zip/end? loc)
+        (recur (zip/next loc))))))
+
+(defn find-children
+  [root pred]
+  (loop [loc (iff-zipper root) nodes []]
+    (if (zip/end? loc)
+      nodes
+      (recur (zip/next loc) (if (pred (zip/node loc))
+                              (conj nodes (zip/node loc))
+                              nodes)))))
 
 (defn get-ubyte
   ([buf] (bit-and (.get buf) 0xff))

@@ -1,23 +1,20 @@
 (ns swg.assets.iff
-  (:refer-clojure :exclude [record?])
   (:use clojure.core.matrix)
   (:require [clojure.tools.namespace.repl :refer [refresh-all]]
             [clojure.java.io :as io]
             [criterium.core :refer [quick-bench]]
-            [swg.assets.util :refer :all])
+            [swg.assets.util :refer :all :exclude [record?]])
   (:import (java.io File RandomAccessFile)
            (java.nio ByteBuffer ByteOrder MappedByteBuffer)
            (java.nio.channels FileChannel FileChannel$MapMode)))
 
 (set-current-implementation :vectorz)
 
-(defn form?
-  [x]
-  (and (map? x) (contains? x :children)))
+(defmulti load-node :type)
 
-(defn record?
-  [x]
-  (and (map? x) (contains? x :data)))
+(defmethod load-node :default
+  [node]
+  node)
 
 (defn read-form
   [buf]
