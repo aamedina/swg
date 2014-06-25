@@ -46,7 +46,8 @@
 
 (defn get-float
   ([buf]
-     (read-string (.format formatter (.getFloat buf)))
+     ;; (read-string (.format formatter ))
+     (.getFloat buf)
      #_(let [flt (with-precision 6 (/ (bigdec (.getFloat buf)) 1))]
        (cond 
          (> (.scale flt) 6) (.setScale flt 6 java.math.RoundingMode/UP)
@@ -55,7 +56,8 @@
          (== 1.0M flt) 1
          :else flt)))
   ([buf pos]
-     (read-string (.format formatter (.getFloat buf pos)))
+     (.getFloat buf pos)
+     ;; (read-string (.format formatter ))
      #_(let [flt (with-precision 6 (/ (bigdec (.getFloat buf pos)) 1))]
        (cond 
          (> (.scale flt) 6) (.setScale flt 6 java.math.RoundingMode/UP)

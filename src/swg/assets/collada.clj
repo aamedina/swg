@@ -26,8 +26,8 @@
       [:authoring_tool "Clojure"]
       [:copyright "Sony Online Entertainment"]]
      [:created date]
-     [:modified date]
-     [:up_axis "Y_UP"]]))
+     [:modified date]]
+    [:up_axis "Y_UP"]))
 
 (defelem library-cameras
   [& cameras]
@@ -65,8 +65,12 @@
                            (:position :normal) (* (count coll) 3)
                            :map (* (count coll) 2))}
     (case k
-      (:position :normal) (str/join " " (flatten (map k coll)))
-      :map (str/join " " (flatten (map (comp first k) coll))))]
+      (:position :normal) (str/join " " (mapcat (fn [vertex]
+                                                  (let [[x y z] (k vertex)]
+                                                    [x y (- z)])) coll))
+      :map (str/join " " (mapcat (fn [vertex]
+                                   (let [[x y] (first (k vertex))]
+                                     [x (- 1.0 y)])) coll)))]
    [:technique_common (accessor-node n coll k name)]])
 
 (defelem geometry
@@ -83,16 +87,13 @@
      [:input {:offset 0
               :semantic "VERTEX"
               :source (str "#geometry" n "-lib-vertices")}]
-     [:input {:offset 1
+     [:input {:offset 0
               :semantic "NORMAL"
               :source (str "#geometry" n "-lib-normals")}]
-     [:input {:offset 2
+     [:input {:offset 0
               :semantic "TEXCOORD"
-              :source (str "#geometry" n "-lib-maps")
-              :set 0}]
-     [:p (str/join " " (->> indices
-                            (partition 3)
-                            (map reverse)))]]]])
+              :source (str "#geometry" n "-lib-maps")}]
+     #_[:p (str/join " " (mapcat reverse (partition 3 indices)))]]]])
 
 (defelem library-geometries
   [geometries]
@@ -102,9 +103,6 @@
 (defelem node
   [n geometry]
   [:node {:id "geometry" :name "geometry"}
-   [:rotate {:sid "rotateZ"} "0 0 1 0"]
-   [:rotate {:sid "rotateY"} "0 1 0 0"]
-   [:rotate {:sid "rotateX"} "1 0 0 0"]
    [:instance_geometry {:url (str "#" "geometry" n "-lib")}]])
 
 (defelem library-visual-scenes

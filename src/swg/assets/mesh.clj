@@ -28,12 +28,11 @@
 
 (defn read-vec2
   [buf pos]
-  [(get-float buf pos)
-   (read-string (.format formatter (- 1.0 (get-float buf (+ pos 4)))))])
+  [(get-float buf pos) (get-float buf (+ pos 4))])
 
 (defn read-vec3
   [buf pos]
-  [(get-float buf pos) (get-float buf (+ pos 4)) (- (get-float buf (+ pos 8)))])
+  [(get-float buf pos) (get-float buf (+ pos 4)) (get-float buf (+ pos 8))])
 
 (defn read-color
   [buf pos]
@@ -62,7 +61,8 @@
         bpv (/ (:size data-node) vertex-count)
         vertex-data (:data data-node)
         vertices (pmap (fn [pos] (read-vertex vertex-data bpv pos))
-                      (range 0 (* vertex-count bpv) bpv))]
+                       (range 0 (* vertex-count bpv) bpv))]
+    (println "vertices:" vertex-count)
     (into [] vertices)))
 
 (defmethod load-node "INDX"
@@ -73,7 +73,8 @@
                        (case bpi
                          2 (.getShort data pos)
                          4 (.getInt data pos)))
-                     (range 0 (* index-count bpi) bpi))]
+                      (range 0 (* index-count bpi) bpi))]
+    (println "indices:" index-count)
     (into [] indices)))
 
 (defmethod load-node "SIDX"
