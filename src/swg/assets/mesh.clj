@@ -22,13 +22,18 @@
     8 [(.getInt data) (.getInt data)]
     (.getInt data)))
 
+(defn read-vec
+  [buf n]
+  (vec (repeatedly n #(get-float buf))))
+
 (defn read-vec2
   [buf pos]
-  [(get-float buf pos) (get-float buf (+ pos 4))])
+  [(get-float buf pos)
+   (read-string (.format formatter (- 1.0 (get-float buf (+ pos 4)))))])
 
 (defn read-vec3
   [buf pos]
-  [(get-float buf pos) (get-float buf (+ pos 4)) (get-float buf (+ pos 8))])
+  [(get-float buf pos) (get-float buf (+ pos 4)) (- (get-float buf (+ pos 8)))])
 
 (defn read-color
   [buf pos]
@@ -37,70 +42,18 @@
 
 (defn read-vertex
   [vertex-data bpv pos]
-  (case bpv
-    32 [(read-vec3 vertex-data pos)
-        (read-vec3 vertex-data (+ 12 pos))
-        [(read-vec2 vertex-data (+ 24 pos))]]
-    36 [(read-vec3 vertex-data pos)
-        (read-vec3 vertex-data (+ 12 pos))
-        (read-color vertex-data (+ 24 pos))
-        [(read-vec2 vertex-data (+ 28 pos))]]
-    40 [(read-vec3 vertex-data pos)
-        (read-vec3 vertex-data (+ 12 pos))
-        [(read-vec2 vertex-data (+ 24 pos))
-         (read-vec2 vertex-data (+ 32 pos))]]
-    44 [(read-vec3 vertex-data pos)
-        (read-vec3 vertex-data (+ 12 pos))
-        (read-color vertex-data (+ 24 pos))
-        [(read-vec2 vertex-data (+ 28 pos))
-         (read-vec2 vertex-data (+ 36 pos))]]
-    48 [(read-vec3 vertex-data pos)
-        (read-vec3 vertex-data (+ 12 pos))
-        [(read-vec2 vertex-data (+ 24 pos))
-         (read-vec2 vertex-data (+ 32 pos))
-         (read-vec2 vertex-data (+ 40 pos))]]
-    52 [(read-vec3 vertex-data pos)
-        (read-vec3 vertex-data (+ 12 pos))
-        (read-color vertex-data (+ 24 pos))
-        [(read-vec2 vertex-data (+ 28 pos))
-         (read-vec2 vertex-data (+ 36 pos))
-         (read-vec2 vertex-data (+ 44 pos))]]
-    56 [(read-vec3 vertex-data pos)
-        (read-vec3 vertex-data (+ 12 pos))
-        [(read-vec2 vertex-data (+ 24 pos))
-         (read-vec2 vertex-data (+ 32 pos))
-         (read-vec2 vertex-data (+ 40 pos))
-         (read-vec2 vertex-data (+ 48 pos))]]
-    60 [(read-vec3 vertex-data pos)
-        (read-vec3 vertex-data (+ 12 pos))
-        (read-color vertex-data (+ 24 pos))
-        [(read-vec2 vertex-data (+ 28 pos))
-         (read-vec2 vertex-data (+ 36 pos))
-         (read-vec2 vertex-data (+ 44 pos))
-         (read-vec2 vertex-data (+ 52 pos))]]
-    64 [(read-vec3 vertex-data pos)
-        (read-vec3 vertex-data (+ 12 pos))
-        [(read-vec2 vertex-data (+ 24 pos))
-         (read-vec2 vertex-data (+ 32 pos))
-         (read-vec2 vertex-data (+ 40 pos))
-         (read-vec2 vertex-data (+ 48 pos))
-         (read-vec2 vertex-data (+ 56 pos))]]
-    68 [(read-vec3 vertex-data pos)
-        (read-vec3 vertex-data (+ 12 pos))
-        (read-color vertex-data (+ 24 pos))
-        [(read-vec2 vertex-data (+ 28 pos))
-         (read-vec2 vertex-data (+ 36 pos))
-         (read-vec2 vertex-data (+ 44 pos))
-         (read-vec2 vertex-data (+ 52 pos))
-         (read-vec2 vertex-data (+ 56 pos))]]
-    72 [(read-vec3 vertex-data pos)
-        (read-vec3 vertex-data (+ 12 pos))
-        [(read-vec2 vertex-data (+ 24 pos))
-         (read-vec2 vertex-data (+ 32 pos))
-         (read-vec2 vertex-data (+ 40 pos))
-         (read-vec2 vertex-data (+ 48 pos))
-         (read-vec2 vertex-data (+ 56 pos))
-         (read-vec2 vertex-data (+ 64 pos))]]))
+  (let [base-map {:position (read-vec3 vertex-data pos)
+                  :normal (read-vec3 vertex-data (+ pos 12))}]
+    (case bpv
+      (32 40 48 56 64 72)
+      (assoc base-map
+        :map (mapv #(read-vec2 vertex-data %)
+                   (range (+ 24 pos) (+ (- bpv 24) (+ 24 pos)) 8)))
+      (36 44 52 60 68)
+      (assoc base-map
+        :color (read-color vertex-data (+ 24 pos))
+        :map (mapv #(read-vec2 vertex-data %)
+                   (range (+ 28 pos) (+ (- bpv 28) (+ 28 pos)) 8))))))
 
 (defmethod load-node "VTXA"
   [{:keys [data size children]}]
@@ -109,7 +62,7 @@
         bpv (/ (:size data-node) vertex-count)
         vertex-data (:data data-node)
         vertices (pmap (fn [pos] (read-vertex vertex-data bpv pos))
-                       (range 0 (* vertex-count bpv) bpv))]
+                      (range 0 (* vertex-count bpv) bpv))]
     (into [] vertices)))
 
 (defmethod load-node "INDX"
@@ -117,10 +70,10 @@
   (let [index-count (.getInt data)
         bpi (/ (- size 4) index-count)
         indices (pmap (fn [pos]
-                        (case bpi
-                          2 (.getShort data pos)
-                          4 (.getInt data pos)))
-                      (range 0 (* index-count bpi) bpi))]
+                       (case bpi
+                         2 (.getShort data pos)
+                         4 (.getInt data pos)))
+                     (range 0 (* index-count bpi) bpi))]
     (into [] indices)))
 
 (defmethod load-node "SIDX"
@@ -159,19 +112,19 @@
         cnt (.getInt (:data cnt-node))
         geometries (if (>= (count geometry-nodes)
                            (.availableProcessors (Runtime/getRuntime)))
-                     (pmap load-geometry-node geometry-nodes)
-                     (r/map load-geometry-node geometry-nodes))]
+                     (map load-geometry-node geometry-nodes)
+                     (map load-geometry-node geometry-nodes))]
     (into [] geometries)))
 
-(def yt1300
-  (binding [iff/*prefix-path* "resources/extracted_jtl"]
-    (-> "resources/extracted_jtl/appearance/mesh/yt1300_l0.msh"
-        iff/load-iff-file
-        load-node
-        time)))
+;; (def yt1300
+;;   (binding [iff/*prefix-path* "resources/extracted_jtl"]
+;;     (-> "resources/extracted_jtl/appearance/mesh/yt1300_l0.msh"
+;;         iff/load-iff-file
+;;         load-node
+;;         time)))
 
 (def star-destroyer
   (-> "resources/extracted/appearance/mesh/star_destroyer.msh" iff/load-iff-file load-node time))
 
-(def theed-palace
-  (-> "resources/extracted/appearance/mesh/thm_nboo_thed_theed_palace_r0_mesh_l0_c0_l0.msh" iff/load-iff-file load-node time))
+;; (def theed-palace
+;;   (-> "resources/extracted/appearance/mesh/thm_nboo_thed_theed_palace_r0_mesh_l0_c0_l0.msh" iff/load-iff-file load-node time))

@@ -42,9 +42,12 @@
                               (conj nodes (zip/node loc))
                               nodes)))))
 
+(def formatter (java.text.DecimalFormat. "0.######"))
+
 (defn get-float
   ([buf]
-     (let [flt (with-precision 6 (/ (bigdec (.getFloat buf)) 1))]
+     (read-string (.format formatter (.getFloat buf)))
+     #_(let [flt (with-precision 6 (/ (bigdec (.getFloat buf)) 1))]
        (cond 
          (> (.scale flt) 6) (.setScale flt 6 java.math.RoundingMode/UP)
          (zero? flt) 0
@@ -52,7 +55,8 @@
          (== 1.0M flt) 1
          :else flt)))
   ([buf pos]
-     (let [flt (with-precision 6 (/ (bigdec (.getFloat buf pos)) 1))]
+     (read-string (.format formatter (.getFloat buf pos)))
+     #_(let [flt (with-precision 6 (/ (bigdec (.getFloat buf pos)) 1))]
        (cond 
          (> (.scale flt) 6) (.setScale flt 6 java.math.RoundingMode/UP)
          (zero? flt) 0

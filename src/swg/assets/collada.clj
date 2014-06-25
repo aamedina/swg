@@ -15,29 +15,6 @@
            (java.nio.channels FileChannel FileChannel$MapMode)
            (javax.xml.bind DatatypeConverter)))
 
-
-(defelem library-cameras
-  [& cameras]
-  [:library_cameras])
-
-(defelem library-lights
-  [& lights]
-  [:library_lights])
-
-(defelem library-materials
-  [geometries]
-  [:library_materials])
-
-(defelem geometry
-  [n geo]
-  [:geometry {}
-   [:mesh]])
-
-(defelem library-geometries
-  [geometries]
-  [:library_geometries
-   (map-indexed geometry geometries)])
-
 (defelem asset
   []
   (let [date (-> (java.util.TimeZone/getTimeZone "UTC")
@@ -52,23 +29,113 @@
      [:modified date]
      [:up_axis "Y_UP"]]))
 
+(defelem library-cameras
+  [& cameras]
+  [:library_cameras])
+
+(defelem library-lights
+  [& lights]
+  [:library_lights])
+
+(defelem library-materials
+  [geometries]
+  [:library_materials])
+
+(defelem accessor-node
+  [n coll k name]
+  [:accessor {:count (count coll)
+              :offset 0
+              :source (str "#" "geometry" n  "-lib-" name "s-array")
+              :stride (case k (:position :normal) 3 :map 2)}
+   (case k
+     (:position :normal) [:param {:name "X" :type "float"}]
+     :map [:param {:name "S" :type "float"}])
+   (case k
+     (:position :normal) [:param {:name "Y" :type "float"}]
+     :map [:param {:name "T" :type "float"}])
+   (case k
+     (:position :normal) [:param {:name "Z" :type "float"}]
+     nil)])
+
+(defelem source
+  [n coll k name]
+  [:source {:id (str "geometry" n "-lib-" name "s") :name name}
+   [:float_array {:id (str "geometry" n "-lib-" name "s-array")
+                  :count (case k
+                           (:position :normal) (* (count coll) 3)
+                           :map (* (count coll) 2))}
+    (case k
+      (:position :normal) (str/join " " (flatten (map k coll)))
+      :map (str/join " " (flatten (map (comp first k) coll))))]
+   [:technique_common (accessor-node n coll k name)]])
+
+(defelem geometry
+  [n {:keys [shader vertices indices secondary]}]
+  [:geometry {:id (str "geometry" n "-lib") :name (str "geometry" n)}
+   [:mesh
+    (source n vertices :position "position")
+    (source n vertices :normal "normal")
+    (source n vertices :map "map")
+    [:vertices {:id (str "geometry" n "-lib-vertices")}
+     [:input {:semantic "POSITION"
+              :source (str "#geometry" n "-lib-positions")}]]
+    [:triangles {:count (/ (count indices) 3)}
+     [:input {:offset 0
+              :semantic "VERTEX"
+              :source (str "#geometry" n "-lib-vertices")}]
+     [:input {:offset 1
+              :semantic "NORMAL"
+              :source (str "#geometry" n "-lib-normals")}]
+     [:input {:offset 2
+              :semantic "TEXCOORD"
+              :source (str "#geometry" n "-lib-maps")
+              :set 0}]
+     [:p (str/join " " (->> indices
+                            (partition 3)
+                            (map reverse)))]]]])
+
+(defelem library-geometries
+  [geometries]
+  [:library_geometries
+   (map-indexed geometry geometries)])
+
+(defelem node
+  [n geometry]
+  [:node {:id "geometry" :name "geometry"}
+   [:rotate {:sid "rotateZ"} "0 0 1 0"]
+   [:rotate {:sid "rotateY"} "0 1 0 0"]
+   [:rotate {:sid "rotateX"} "1 0 0 0"]
+   [:instance_geometry {:url (str "#" "geometry" n "-lib")}]])
+
+(defelem library-visual-scenes
+  [geometries]
+  [:library_visual_scenes 
+   [:visual_scene {:id "VisualSceneNode" :name "untitled"}
+    (map-indexed node geometries)]])
+
 (defelem collada
   [geometries]
   [:COLLADA {:xmlns "http://www.collada.org/2005/11/COLLADASchema"
              :version "1.4.1"}
    (asset)
-   (library-geometries geometries)])
+   (library-geometries geometries)
+   (library-visual-scenes geometries)
+   [:scene
+    [:instance_visual_scene {:url "#VisualSceneNode"}]]])
 
 (defn export-collada
-  [geometries]
-  (spit "resources/extracted/star_destroyer.dae"
-        (xml/indent-str (xml/as-elements (collada geometries)))))
+  [geometries to-path]
+  (let [xml (xml/indent-str (xml/as-elements (collada (take 1 geometries))))]
+    (spit to-path xml)))
+
+
 
 ;; (def yt1300
 ;;   (-> mesh/yt1300 export-collada))
 
 (def star-destroyer
-  (-> mesh/star-destroyer export-collada))
+  (-> mesh/star-destroyer
+      (export-collada "resources/extracted/star_destroyer.dae")))
 
 ;; (def theed-palace
 ;;   (-> mesh/theed-palace))
