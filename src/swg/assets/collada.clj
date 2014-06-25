@@ -26,8 +26,7 @@
       [:authoring_tool "Clojure"]
       [:copyright "Sony Online Entertainment"]]
      [:created date]
-     [:modified date]]
-    [:up_axis "Y_UP"]))
+     [:modified date]]))
 
 (defelem library-cameras
   [& cameras]
@@ -43,19 +42,15 @@
 
 (defelem accessor-node
   [n coll k name]
-  [:accessor {:count (count coll)
-              :offset 0
-              :source (str "#" "geometry" n  "-lib-" name "s-array")
-              :stride (case k (:position :normal) 3 :map 2)}
-   (case k
-     (:position :normal) [:param {:name "X" :type "float"}]
-     :map [:param {:name "S" :type "float"}])
-   (case k
-     (:position :normal) [:param {:name "Y" :type "float"}]
-     :map [:param {:name "T" :type "float"}])
-   (case k
-     (:position :normal) [:param {:name "Z" :type "float"}]
-     nil)])
+  (into [:accessor {:count (count coll)
+                    :source (str "#" "geometry" n  "-lib-" name "s-array")
+                    :stride (case k (:position :normal) 3 :map 2)}]
+        (case k
+          (:position :normal) [[:param {:name "X" :type "float"}]
+                               [:param {:name "Y" :type "float"}]
+                               [:param {:name "Z" :type "float"}]]
+          :map [[:param {:name "S" :type "float"}]
+                [:param {:name "T" :type "float"}]])))
 
 (defelem source
   [n coll k name]
@@ -65,12 +60,8 @@
                            (:position :normal) (* (count coll) 3)
                            :map (* (count coll) 2))}
     (case k
-      (:position :normal) (str/join " " (mapcat (fn [vertex]
-                                                  (let [[x y z] (k vertex)]
-                                                    [x y (- z)])) coll))
-      :map (str/join " " (mapcat (fn [vertex]
-                                   (let [[x y] (first (k vertex))]
-                                     [x (- 1.0 y)])) coll)))]
+      (:position :normal) (str/join " " (mapcat k coll))
+      :map (str/join " " (mapcat (comp flatten k) coll)))]
    [:technique_common (accessor-node n coll k name)]])
 
 (defelem geometry
@@ -83,7 +74,7 @@
     [:vertices {:id (str "geometry" n "-lib-vertices")}
      [:input {:semantic "POSITION"
               :source (str "#geometry" n "-lib-positions")}]]
-    [:triangles {:count (/ (count indices) 3)}
+    [:triangles {:count (count indices)}
      [:input {:offset 0
               :semantic "VERTEX"
               :source (str "#geometry" n "-lib-vertices")}]
@@ -93,7 +84,7 @@
      [:input {:offset 0
               :semantic "TEXCOORD"
               :source (str "#geometry" n "-lib-maps")}]
-     #_[:p (str/join " " (mapcat reverse (partition 3 indices)))]]]])
+     [:p (str/join " " (flatten indices))]]]])
 
 (defelem library-geometries
   [geometries]
@@ -102,7 +93,10 @@
 
 (defelem node
   [n geometry]
-  [:node {:id "geometry" :name "geometry"}
+  [:node {:id (str "mesh" n) :name "mesh"}
+   [:rotate {:sid "rotateZ"} "0 0 1 0"]
+   [:rotate {:sid "rotateY"} "0 1 0 0"]
+   [:rotate {:sid "rotateX"} "1 0 0 0"]
    [:instance_geometry {:url (str "#" "geometry" n "-lib")}]])
 
 (defelem library-visual-scenes
@@ -123,7 +117,7 @@
 
 (defn export-collada
   [geometries to-path]
-  (let [xml (xml/indent-str (xml/as-elements (collada (take 1 geometries))))]
+  (let [xml (xml/indent-str (xml/as-elements (collada geometries)))]
     (spit to-path xml)))
 
 

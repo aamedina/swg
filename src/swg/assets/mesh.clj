@@ -62,19 +62,20 @@
         vertex-data (:data data-node)
         vertices (pmap (fn [pos] (read-vertex vertex-data bpv pos))
                        (range 0 (* vertex-count bpv) bpv))]
-    (println "vertices:" vertex-count)
+    #_(println "vertices:" vertex-count)
     (into [] vertices)))
+
+(defn read-triangle
+  [data bpi]
+  (case bpi
+    2 [(.getShort data) (.getShort data) (.getShort data)]
+    4 [(.getInt data) (.getInt data) (.getInt data)]))
 
 (defmethod load-node "INDX"
   [{:keys [data size children]}]
   (let [index-count (.getInt data)
         bpi (/ (- size 4) index-count)
-        indices (pmap (fn [pos]
-                       (case bpi
-                         2 (.getShort data pos)
-                         4 (.getInt data pos)))
-                      (range 0 (* index-count bpi) bpi))]
-    (println "indices:" index-count)
+        indices (repeatedly (/ index-count 3) (fn [] (read-triangle data bpi)))]
     (into [] indices)))
 
 (defmethod load-node "SIDX"
