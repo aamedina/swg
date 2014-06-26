@@ -36,17 +36,19 @@
         tag (load-node (find-child node #(= (:type %) "TAG ")))
         colors (load-node (find-child node #(= (:type %) "MATL")))
         texture (find-child node #(= (:type %) "NAME"))
-        texture-file (-> (get-string (:data texture) (dec (:size texture)))
-                         (str/replace #"dds$" "png"))]
+        texture-file (-> #_(str iff/*prefix-path* "/")
+                         (get-string (:data texture) (dec (:size texture)))
+                         (str/replace #"dds$" "png")
+                         (str/replace #"\\" "/"))]
     (assoc colors
       :texture texture-file)))
 
 (defmethod load-node "CSHD"
   [{:keys [type children] :as node}]
-  type)
+  (load-node (find-child node #(= (:type %) "SSHT"))))
 
 (def yt1300
-  (->> (map (partial iff/load-iff-file "resources/extracted_jtl")
+  (->> (map (partial iff/load-iff-file "resources/merged")
             ["shader/yt1300_a_hcsb21.sht"
              "shader/yt1300_engine_as8.sht"
              "shader/yt1300_gun_s01_as8.sht"
@@ -55,7 +57,7 @@
        (map load-node)))
 
 (def star-destroyer
-  (->> (map (partial iff/load-iff-file "resources/extracted")
+  (->> (map (partial iff/load-iff-file "resources/merged")
             ["shader/sd_hangar_a_as6.sht"
              "shader/sd_win_a_as6.sht"
              "shader/sd_grey_a_as6.sht"

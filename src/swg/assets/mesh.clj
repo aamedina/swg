@@ -100,7 +100,8 @@
         vertices (load-node vtxa)
         indices (load-node indx)
         bpi (if (instance? java.lang.Short (first indices)) 2 4)
-        secondary (when sidx (load-node (assoc sidx :bpi bpi)))]
+        secondary nil
+        #_(when sidx (load-node (assoc sidx :bpi bpi)))]
     (cond-> {:texture (load-node (iff/load-iff-file iff/*prefix-path* sht-file))
              :vertices vertices
              :indices indices}
@@ -118,14 +119,14 @@
     (into [] geometries)))
 
 ;; (def yt1300
-;;   (binding [iff/*prefix-path* "resources/extracted_jtl"]
-;;     (-> "resources/extracted_jtl/appearance/mesh/yt1300_l0.msh"
+;;   (binding [iff/*prefix-path* "resources/merged"]
+;;     (-> "resources/merged/appearance/mesh/yt1300_l0.msh"
 ;;         iff/load-iff-file
 ;;         load-node
 ;;         time)))
 
-(def star-destroyer
-  (-> "resources/extracted/appearance/mesh/star_destroyer.msh" iff/load-iff-file load-node time))
+;; (def star-destroyer
+;;   (-> "resources/extracted/appearance/mesh/star_destroyer.msh" iff/load-iff-file load-node time))
 
 ;; (def theed-palace
 ;;   (-> "resources/extracted/appearance/mesh/thm_nboo_thed_theed_palace_r0_mesh_l0_c0_l0.msh" iff/load-iff-file load-node time))

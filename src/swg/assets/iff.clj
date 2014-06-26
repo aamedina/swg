@@ -10,7 +10,7 @@
 
 (set-current-implementation :vectorz)
 
-(def ^:dynamic *prefix-path* "resources/extracted")
+(def ^:dynamic *prefix-path* "resources/merged")
 
 (defmulti load-node :type)
 
@@ -48,11 +48,11 @@
        (load-children buf header))))
 
 (def yt1300
-  (-> "resources/extracted_jtl/appearance/mesh/yt1300_l0.msh"
+  (-> "resources/merged/appearance/mesh/yt1300_l1.msh"
       load-iff-file
       time))
 
 (def star-destroyer
-  (-> "resources/extracted/appearance/mesh/star_destroyer.msh"
+  (-> "resources/merged/appearance/mesh/star_destroyer.msh"
       load-iff-file
       time))
