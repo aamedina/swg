@@ -62,7 +62,6 @@
         vertex-data (:data data-node)
         vertices (pmap (fn [pos] (read-vertex vertex-data bpv pos))
                        (range 0 (* vertex-count bpv) bpv))]
-    #_(println "vertices:" vertex-count)
     (into [] vertices)))
 
 (defn read-triangle
@@ -114,7 +113,7 @@
         cnt (.getInt (:data cnt-node))
         geometries (if (>= (count geometry-nodes)
                            (.availableProcessors (Runtime/getRuntime)))
-                     (map load-geometry-node geometry-nodes)
+                     (pmap load-geometry-node geometry-nodes)
                      (map load-geometry-node geometry-nodes))]
     (into [] geometries)))
 
