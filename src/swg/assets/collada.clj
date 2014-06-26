@@ -60,30 +60,29 @@
    (map-indexed (fn [n {:keys [texture]}]
                   (let [{:keys [ambient diffuse specular emissive shininess]
                          :as colors} texture]
-                    [:effect {:id (str "effect" n)}
-                     [:profile_COMMON
-                      [:newparam {:sid (str "image" n "-surface")}
-                       [:surface {:type "2D"}
-                        [:init_from (str "image" n)]
-                        [:format "A8R8G8B8"]]]
-                      [:newparam {:sid (str "image" n "-sampler")}
-                       [:sampler2D
-                        [:source (str "image" n "-surface")]
-                        [:minfilter "LINEAR_MIPMAP_LINEAR"]
-                        [:magfilter "LINEAR"]]]
-                      [:technique {:sid "common"}
-                       [:phong
-                        [:emission [:color "0 0 0 1"]]
-                        [:ambient [:color "0 0 0 1"]]
-                        [:diffuse
-                         [:texture {:texture (str "image" n "-sampler")
-                                    :texcoord (str "TEX" n)}]]
-                        [:specular [:color "0 0 0 1"]]
-                        [:shininess [:float shininess]]
-                        [:reflective [:color "0 0 0 1"]]
-                        [:reflectivity [:float "0.1"]]
-                        [:transparent {:opaque "RGB_ZERO"} [:color "0 0 0 1"]]
-                        [:transparency [:float "1"]]]]]]))
+                    (let [[r g b a] diffuse]
+                      [:effect {:id (str "effect" n)}
+                       [:profile_COMMON
+                        [:newparam {:sid (str "image" n "-surface")}
+                         [:surface {:type "2D"}
+                          [:init_from (str "image" n)]
+                          [:format "A8R8G8B8"]]]
+                        [:newparam {:sid (str "image" n "-sampler")}
+                         [:sampler2D
+                          [:source (str "image" n "-surface")]]]
+                        [:technique {:sid "common"}
+                         [:phong
+                          [:emission [:color (str/join " " emissive)]]
+                          [:ambient [:color (str/join " " ambient)]]
+                          [:diffuse
+                           [:texture {:texture (str "image" n "-sampler")
+                                      :texcoord (str "TEX" n)}]]
+                          [:specular [:color (str/join " " specular)]]
+                          [:shininess [:float shininess]]
+                          [:reflective [:color (str/join " " diffuse)]]
+                          [:reflectivity [:float "0.5"]]
+                          [:transparent [:color (str/join " " diffuse)]]
+                          [:transparency [:float a]]]]]])))
                 geometries)])
 
 (defelem accessor-node
@@ -142,9 +141,6 @@
 (defelem node
   [n geometry]
   [:node {:id (str "mesh" n) :name "mesh"}
-   [:rotate {:sid "rotateZ"} "0 0 1 0"]
-   [:rotate {:sid "rotateY"} "0 1 0 0"]
-   [:rotate {:sid "rotateX"} "1 0 0 0"]
    [:instance_geometry {:url (str "#" "geometry" n "-lib")}
     [:bind_material
      [:technique_common
@@ -175,22 +171,44 @@
   (let [xml (xml/indent-str (xml/as-elements (collada geometries)))]
     (spit to-path xml)))
 
-(def yt1300
-  (binding [iff/*prefix-path* "resources/merged"]
-    (-> "resources/merged/appearance/mesh/yt1300_l0.msh"
-        iff/load-iff-file
-        load-node
-        (export-collada "resources/merged/yt1300.dae")
-        time)))
+;; (def yt1300
+;;   (binding [iff/*prefix-path* "resources/merged"]
+;;     (-> "resources/merged/appearance/mesh/yt1300_l0.msh"
+;;         iff/load-iff-file
+;;         load-node
+;;         (export-collada "resources/merged/yt1300.dae")
+;;         time)))
 
-(def star-destroyer
-  (binding [iff/*prefix-path* "resources/merged"]
-    (-> "resources/merged/appearance/mesh/star_destroyer.msh"
-        iff/load-iff-file
-        load-node
-        (export-collada "resources/merged/star_destroyer.dae")
-        time)))
+;; (def star-destroyer
+;;   (binding [iff/*prefix-path* "resources/merged"]
+;;     (-> "resources/merged/appearance/mesh/star_destroyer_space_l0_c0_l0.msh"
+;;         iff/load-iff-file
+;;         load-node
+;;         (export-collada "resources/merged/star_destroyer.dae")
+;;         time)))
 
 ;; (def theed-palace
-;;   (-> mesh/theed-palace
-;;       (export-collada "resources/extracted/theed_palace.dae")))
+;;   (binding [iff/*prefix-path* "resources/merged"]
+;;     (-> "resources/merged/appearance/mesh/thm_nboo_thed_theed_palace_r0_mesh_l0_c0_l0.msh"
+;;         iff/load-iff-file
+;;         load-node
+;;         (export-collada "resources/merged/theed_palace.dae")
+;;         time)))
+
+(defn export-file
+  [from-path to-path]
+  (-> (iff/load-iff-file from-path)
+      (load-node)
+      (export-collada to-path)
+      (time)))
+(comment
+  (export-file "resources/merged/appearance/mesh/space_station.msh"
+               "resources/merged/space_station.dae")
+  (let [files (->> (file-seq (io/as-file "resources/merged/appearance/mesh"))
+                   (filter #(re-seq #"star_destroyer_space_l0" (.getPath %)))
+                   (interleave (range))
+                   (partition 2))]
+    (time (doseq [[n file] files
+                  :let [prefix "resources/merged/star_destroyer_space_l0_"
+                        path (str prefix n ".dae")]]
+            (export-collada (load-node (iff/load-iff-file file)) path)))))

@@ -20,7 +20,7 @@
 
 (defn read-color
   [buf]
-  (mapv get-float (repeat 4 buf)))
+  (into [] (reverse (map get-float (repeat 4 buf)))))
 
 (defmethod load-node "MATL"
   [{:keys [data]}]
@@ -43,24 +43,15 @@
     (assoc colors
       :texture texture-file)))
 
+(defmethod load-node "PAL "
+  [{:keys [type data size] :as node}]
+  (apply str (map char (repeatedly size #(.get data)))))
+
+(defmethod load-node "TFAC"
+  [{:keys [type children] :as node}]
+  (map load-node children))
+
 (defmethod load-node "CSHD"
   [{:keys [type children] :as node}]
   (load-node (find-child node #(= (:type %) "SSHT"))))
 
-(def yt1300
-  (->> (map (partial iff/load-iff-file "resources/merged")
-            ["shader/yt1300_a_hcsb21.sht"
-             "shader/yt1300_engine_as8.sht"
-             "shader/yt1300_gun_s01_as8.sht"
-             "shader/yt1300_b_hcsb21.sht"
-             "shader/yt1300_dish_s01_hcsb21.sht"])
-       (map load-node)))
-
-(def star-destroyer
-  (->> (map (partial iff/load-iff-file "resources/merged")
-            ["shader/sd_hangar_a_as6.sht"
-             "shader/sd_win_a_as6.sht"
-             "shader/sd_grey_a_as6.sht"
-             "shader/sd_mainhull_a_as6.sht"
-             "shader/sd_detail_a_as6.sht"])
-       (map load-node)))

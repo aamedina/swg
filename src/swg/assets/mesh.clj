@@ -118,12 +118,12 @@
                      (map load-geometry-node geometry-nodes))]
     (into [] geometries)))
 
-;; (def yt1300
-;;   (binding [iff/*prefix-path* "resources/merged"]
-;;     (-> "resources/merged/appearance/mesh/yt1300_l0.msh"
-;;         iff/load-iff-file
-;;         load-node
-;;         time)))
+(def yt1300
+  (binding [iff/*prefix-path* "resources/merged"]
+    (-> "resources/merged/appearance/mesh/yt1300_l0.msh"
+        iff/load-iff-file
+        load-node
+        time)))
 
 ;; (def star-destroyer
 ;;   (-> "resources/extracted/appearance/mesh/star_destroyer.msh" iff/load-iff-file load-node time))
