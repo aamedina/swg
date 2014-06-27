@@ -167,7 +167,7 @@
 
 (defmethod load-node "POSN"
   [{:keys [data size]}]
-  [size])
+  (.getFloat data))
 
 (defmethod load-node "XFNM"
   [{:keys [data size]}]
@@ -179,11 +179,10 @@
 
 (defmethod load-node "SKMG"
   [{:keys [size children] :as node}]
-  (->> (node-seq node)
-       (filter util/record?)
-       (drop 10)
-       (take 5)
-       (map load-node)))
+  (let [[info skeleton-file] (->> (node-seq node)
+                                  (filter util/record?)
+                                  (map load-node))]
+    info))
 
 (def at-at
   (load-node (iff/load-iff-file "appearance/mesh/at_at_l0.mgn")))
