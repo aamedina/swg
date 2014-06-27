@@ -77,10 +77,7 @@
 
 (defmethod load-node "SLOD"
   [{:keys [type children] :as node}]
-  (let [nodes (->> (node-seq node)
-                   (filter util/record?)
-                   (map (juxt :type load-node)))]
-    (group-by first nodes)))
+  (load-all-nodes node))
 
 (def at-at
   (time (load-node (iff/load-iff-file "appearance/mesh/at_at_l0.mgn"))))
