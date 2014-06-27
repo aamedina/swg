@@ -167,7 +167,9 @@
 
 (defmethod load-node "SKMG"
   [{:keys [size children] :as node}]
-  (update-in (load-all-nodes node) ["NAME"] (partial map iff/load-iff-file)))
+  (-> (load-all-nodes node)
+      (update-in ["NAME"] (partial map iff/load-iff-file))
+      (update-in ["NAME"] (partial map load-node))))
 
 (def at-at
   (time (load-node (iff/load-iff-file "appearance/mesh/at_at_l0.mgn"))))
