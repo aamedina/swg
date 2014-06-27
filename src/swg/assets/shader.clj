@@ -18,21 +18,13 @@
   [{:keys [data]}]
   (get-string data 4))
 
-(defn read-color
-  [buf]
-  (into [] (reverse (map get-float (repeat 4 buf)))))
-
-(defn read-quaternion
-  [buf]
-  (into [] (repeatedly 4 #(.getFloat buf))))
-
 (defmethod load-node "MATL"
   [{:keys [data]}]
-  {:ambient (read-color data)
-   :diffuse (read-color data)
-   :specular (read-color data)
-   :emissive (read-color data)
-   :shininess (get-float data)})
+  {:ambient (read-vec data 4)
+   :diffuse (read-vec data 4)
+   :specular (read-vec data 4)
+   :emissive (read-vec data 4)
+   :shininess (.getFloat data)})
 
 (defmethod load-node "SSHT"
   [{:keys [type children] :as node}]
@@ -64,26 +56,31 @@
   (into [] (repeatedly (/ size 4) #(.getInt data))))
 
 (defmethod load-node "RPRE"
-  [{:keys [type data size] :as node}]
+  [{:keys [data size] :as node}]
   (into [] (repeatedly (/ size 16) #(read-quaternion data))))
 
 (defmethod load-node "RPST"
-  [{:keys [type data size] :as node}]
+  [{:keys [data size] :as node}]
   (into [] (repeatedly (/ size 16) #(read-quaternion data))))
 
 (defmethod load-node "BPTR"
-  [{:keys [type data size] :as node}]
-  #_(into [] (repeatedly  #(read-quaternion data)))
-  {:size (/ (/ size 4) 3)})
+  [{:keys [data size] :as node}]
+  (into [] (repeatedly (/ (/ size 4) 3) #(read-vec data 3))))
+
+(defmethod load-node "BPRO"
+  [{:keys [data size] :as node}]
+  (into [] (repeatedly (/ size 16) #(read-quaternion data))))
+
+(defmethod load-node "JROR"
+  [{:keys [data size] :as node}]
+  (into [] (repeatedly (/ size 4) #(.getInt data))))
 
 (defmethod load-node "SLOD"
   [{:keys [type children] :as node}]
   (let [nodes (->> (node-seq node)
                    (filter util/record?)
-                   #_(map (juxt :type :size))
-                   (map load-node)
-                   (filter map?))]
-    nodes))
+                   (map (juxt :type load-node)))]
+    (zipmap (map first nodes) (map second nodes))))
 
 
 

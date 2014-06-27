@@ -31,23 +31,6 @@
         (.getShort data) (.getShort data) (.getShort data) (.getShort data)]
     (.getInt data)))
 
-(defn read-vec
-  [buf n]
-  (vec (repeatedly n #(get-float buf))))
-
-(defn read-vec2
-  [buf pos]
-  [(get-float buf pos) (get-float buf (+ pos 4))])
-
-(defn read-vec3
-  [buf pos]
-  [(get-float buf pos) (get-float buf (+ pos 4)) (get-float buf (+ pos 8))])
-
-(defn read-color
-  [buf pos]
-  [(get-ubyte buf pos) (get-ubyte buf (+ pos 1))
-   (get-ubyte buf (+ pos 2)) (get-ubyte buf (+ pos 3))])
-
 (defn read-vertex
   [vertex-data bpv pos]
   (let [base-map {:position (read-vec3 vertex-data pos)
@@ -72,12 +55,6 @@
         vertices (pmap (fn [pos] (read-vertex vertex-data bpv pos))
                        (range 0 (* vertex-count bpv) bpv))]
     (into [] vertices)))
-
-(defn read-triangle
-  [data bpi]
-  (case bpi
-    2 [(.getShort data) (.getShort data) (.getShort data)]
-    4 [(.getInt data) (.getInt data) (.getInt data)]))
 
 (defmethod load-node "INDX"
   [{:keys [data size children]}]
