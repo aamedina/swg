@@ -128,9 +128,33 @@
   (let []
     (map :type (:children geometry-node))))
 
+(defmethod load-node "PIDX"
+  [{:keys [data size]}]
+  (into [] (repeatedly (/ size 4) #(.getInt data))))
+
+(defmethod load-node "DOT3"
+  [{:keys [data size]}]
+  [size])
+
+(defmethod load-node "NORM"
+  [{:keys [data size]}]
+  [size])
+
+(defmethod load-node "TWDT"
+  [{:keys [data size]}]
+  [size])
+
+(defmethod load-node "TWHD"
+  [{:keys [data size]}]
+  [size])
+
+(defmethod load-node "POSN"
+  [{:keys [data size]}]
+  [size])
+
 (defmethod load-node "XFNM"
   [{:keys [data size]}]
-  (str/split (get-string data (dec size)) #"\u0000"))
+  (str/split (get-string data size) #"\u0000"))
 
 (defmethod load-node "SKTM"
   [{:keys [data size]}]
@@ -140,6 +164,7 @@
   [{:keys [size children] :as node}]
   (->> (node-seq node)
        (filter util/record?)
+       (drop 5)
        (take 5)
        (map load-node)))
 
