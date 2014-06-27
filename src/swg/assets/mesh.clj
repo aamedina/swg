@@ -128,6 +128,19 @@
   (let []
     (map :type (:children geometry-node))))
 
+(defmethod load-node "ITL "
+  [{:keys [data size]}]
+  (let [num (.getInt data)]
+    (into [] (flatten (repeatedly num #(read-triangle data 4))))))
+
+(defmethod load-node "TCSD"
+  [{:keys [data size]}]
+  (into [] (repeatedly (/ size 4) #(.getFloat data))))
+
+(defmethod load-node "TXCI"
+  [{:keys [data size]}]
+  (into [] (repeatedly (/ size 4) #(.getInt data))))
+
 (defmethod load-node "NIDX"
   [{:keys [data size]}]
   (into [] (repeatedly (/ size 4) #(.getInt data))))
