@@ -147,7 +147,7 @@
 
 (defmethod load-node "PIDX"
   [{:keys [data size]}]
-  (into [] (repeatedly (/ size 4) #(.getInt data))))
+  (into [] (repeatedly (.getInt data) #(.getInt data))))
 
 (defmethod load-node "DOT3"
   [{:keys [data size]}]
@@ -186,12 +186,11 @@
 
 (defmethod load-node "SKMG"
   [{:keys [size children] :as node}]
-  (let [[info skeleton-file bones positions points
-         bone-and-weights normals dot3 shader-file & nodes]
-        (->> (node-seq node)
-             (filter util/record?)
-             (pmap load-node))]
-    (last (take 18 nodes))))
+  (let [nodes (->> (node-seq node)
+                   (filter util/record?)
+                   (pmap load-node))
+        shader-files (map iff/load-iff-file (filter string? nodes))]
+    shader-files))
 
 (def at-at
   (time (load-node (iff/load-iff-file "appearance/mesh/at_at_l0.mgn"))))
