@@ -131,7 +131,7 @@
 (defmethod load-node "ITL "
   [{:keys [data size]}]
   (let [num (.getInt data)]
-    (into [] (flatten (repeatedly num #(read-triangle data 4))))))
+    (reduce into [] (repeatedly num #(read-triangle data 4)))))
 
 (defmethod load-node "TCSD"
   [{:keys [data size]}]
@@ -163,12 +163,12 @@
 
 (defmethod load-node "TWHD"
   [{:keys [data size]}]
-  [size])
+  (into [] (repeatedly (/ size 4) #(.getInt data))))
 
 (defmethod load-node "POSN"
   [{:keys [data size]}]
   (let [vertex-count (/ (/ size 4) 3)]
-    (into [] (repeatedly vertex-count #(read-vec data 3)))))
+    (reduce into [] (repeatedly vertex-count #(read-vec data 3)))))
 
 (defmethod load-node "XFNM"
   [{:keys [data size]}]
@@ -180,10 +180,10 @@
 
 (defmethod load-node "SKMG"
   [{:keys [size children] :as node}]
-  (let [[info skeleton-file bones positions] (->> (node-seq node)
+  (let [[info skeleton-file bones positions n] (->> (node-seq node)
                                                   (filter util/record?)
                                                   (pmap load-node))]
-    (conj info positions)))
+    n))
 
 (def at-at
   (load-node (iff/load-iff-file "appearance/mesh/at_at_l0.mgn")))
