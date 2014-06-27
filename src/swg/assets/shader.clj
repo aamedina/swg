@@ -80,9 +80,7 @@
   (let [nodes (->> (node-seq node)
                    (filter util/record?)
                    (map (juxt :type load-node)))]
-    (zipmap (map first nodes) (map second nodes))))
-
-
+    (group-by first nodes)))
 
 (def at-at
   (time (load-node (iff/load-iff-file "appearance/mesh/at_at_l0.mgn"))))

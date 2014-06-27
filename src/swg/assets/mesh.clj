@@ -167,11 +167,7 @@
 
 (defmethod load-node "SKMG"
   [{:keys [size children] :as node}]
-  (let [nodes (->> (node-seq node)
-                   (filter util/record?)
-                   (pmap load-node))
-        shader-files (map iff/load-iff-file (filter string? nodes))]
-    (load-node (first shader-files))))
+  (load-all-nodes node))
 
 (def at-at
   (time (load-node (iff/load-iff-file "appearance/mesh/at_at_l0.mgn"))))
