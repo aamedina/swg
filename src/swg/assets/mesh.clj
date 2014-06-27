@@ -51,10 +51,9 @@
   (let [[info data-node] (:children (first children))
         [flags vertex-count] (load-node info)
         bpv (/ (:size data-node) vertex-count)
-        vertex-data (:data data-node)
-        vertices (pmap (fn [pos] (read-vertex vertex-data bpv pos))
-                       (range 0 (* vertex-count bpv) bpv))]
-    (into [] vertices)))
+        vertex-data (:data data-node)]
+    (into [] (pmap (fn [pos] (read-vertex vertex-data bpv pos))
+                   (range 0 (* vertex-count bpv) bpv)))))
 
 (defmethod load-node "INDX"
   [{:keys [data size children]}]
@@ -168,8 +167,8 @@
 (defmethod load-node "SKMG"
   [{:keys [size children] :as node}]
   (-> (load-all-nodes node)
-      (update-in ["NAME"] (partial map iff/load-iff-file))
-      (update-in ["NAME"] (partial map load-node))))
+      (update-in ["NAME"] (partial mapv (comp load-node iff/load-iff-file)))
+      (update-in ["SKTM"] (partial mapv (comp load-node iff/load-iff-file)))))
 
 (def at-at
   (time (load-node (iff/load-iff-file "appearance/mesh/at_at_l0.mgn"))))
