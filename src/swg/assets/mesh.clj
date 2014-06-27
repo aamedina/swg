@@ -167,7 +167,8 @@
 
 (defmethod load-node "POSN"
   [{:keys [data size]}]
-  (.getFloat data))
+  (let [vertex-count (/ (/ size 4) 3)]
+    (into [] (repeatedly vertex-count #(read-vec data 3)))))
 
 (defmethod load-node "XFNM"
   [{:keys [data size]}]
@@ -179,10 +180,10 @@
 
 (defmethod load-node "SKMG"
   [{:keys [size children] :as node}]
-  (let [[info skeleton-file] (->> (node-seq node)
-                                  (filter util/record?)
-                                  (map load-node))]
-    info))
+  (let [[info skeleton-file bones positions] (->> (node-seq node)
+                                                  (filter util/record?)
+                                                  (pmap load-node))]
+    (conj info positions)))
 
 (def at-at
   (load-node (iff/load-iff-file "appearance/mesh/at_at_l0.mgn")))
