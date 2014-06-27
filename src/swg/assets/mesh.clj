@@ -13,11 +13,15 @@
 
 (defmethod load-node "NAME"
   [{:keys [size data] :as node}]
-  (subs (get-string data size) 0 (dec size)))
+  (let [s (str/split (get-string data size) #"\u0000")]
+    (if (== (count s) 1)
+      (first s)
+      s)))
 
 (defmethod load-node "INFO"
   [{:keys [data size]}]
   (case size
+    2 (.getShort data)
     4 (.getInt data)
     6 [(.getInt data) (.getShort data)]
     8 [(.getInt data) (.getInt data)]
@@ -190,7 +194,7 @@
                    (filter util/record?)
                    (pmap load-node))
         shader-files (map iff/load-iff-file (filter string? nodes))]
-    shader-files))
+    (load-node (first shader-files))))
 
 (def at-at
   (time (load-node (iff/load-iff-file "appearance/mesh/at_at_l0.mgn"))))
