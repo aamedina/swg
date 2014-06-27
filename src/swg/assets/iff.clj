@@ -35,7 +35,8 @@
           (recur (if (form? child)
                    (conj children (load-children buf child))
                    (conj children child))))
-        (assoc parent :children children)))))
+        (assoc parent
+          :children (mapv #(assoc % :parent (:type parent)) children))))))
 
 (defn load-iff-file
   ([path]

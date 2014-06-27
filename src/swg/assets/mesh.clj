@@ -92,9 +92,42 @@
              :indices indices}
       secondary (assoc :secondary secondary))))
 
+(defmethod load-node "CNT "
+  [{:keys [data]}]
+  (.getInt data))
+
+(defmethod load-node "DATA"
+  [{:keys [data size parent]}]
+  (case parent
+    "FLOR" (get-string data (.get data))
+    (let [bpv 32]
+      (into [] (pmap (fn [n]
+                       {:position (read-vec data 3)
+                        :normal (read-vec data 3)
+                        :color []
+                        :map (mapv #(read-vec data %) [2])})
+                     (range 0 (/ size bpv)))))))
+
+(defmethod load-node "SPHR"
+  [{:keys [data size]}]
+  {:center (read-vec data 3)
+   :radius (.getFloat data)})
+
+(defmethod load-node "BOX "
+  [{:keys [data size]}]
+  {:length (read-vec data 3)
+   :width (read-vec data 3)})
+
+(defmethod load-node "CYLN"
+  [{:keys [data size]}]
+  {:base (read-vec data 3)
+   :height (read-vec data 5)})
+
 (defmethod load-node "MESH"
   [node]
-  (let [root (first (:children (find-child node #(= (:type %) "SPS "))))
+  (-> (load-all-nodes node)
+      (update-in ["NAME"] (partial mapv (comp load-node iff/load-iff-file))))
+  #_(let [root (first (:children (find-child node #(= (:type %) "SPS "))))
         [cnt-node & geometry-nodes] (:children root)
         cnt (.getInt (:data cnt-node))
         geometries (if (>= (count geometry-nodes)
@@ -170,5 +203,8 @@
       (update-in ["NAME"] (partial mapv (comp load-node iff/load-iff-file)))
       (update-in ["SKTM"] (partial mapv (comp load-node iff/load-iff-file)))))
 
-(def at-at
-  (time (load-node (iff/load-iff-file "appearance/mesh/at_at_l0.mgn"))))
+;; (def at-at
+;;   (time (load-node (iff/load-iff-file "appearance/mesh/at_at_l0.mgn"))))
+
+(def star-destroyer
+  (time (load-node (iff/load-iff-file "appearance/mesh/star_destroyer.msh"))))

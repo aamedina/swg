@@ -143,7 +143,7 @@
   [root]
   (let [nodes (->> (node-seq root)
                    (filter record?)
-                   (map (juxt :type @#'swg.assets.iff/load-node))
+                   (map (juxt :type (resolve 'swg.assets.iff/load-node)))
                    (group-by first))]
     (zipmap (keys nodes)
             (map (fn [group] (mapv second group)) (vals nodes)))))
