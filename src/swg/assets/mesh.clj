@@ -3,7 +3,7 @@
             [clojure.java.io :as io]
             [criterium.core :refer [quick-bench]]
             [swg.assets.iff :as iff :refer [load-node]]
-            [swg.assets.util :refer :all :exclude [record?]]
+            [swg.assets.util :as util :refer :all :exclude [record?]]
             [swg.assets.shader :as shader]
             [clojure.string :as str]
             [clojure.core.reducers :as r])
@@ -18,8 +18,13 @@
 (defmethod load-node "INFO"
   [{:keys [data size]}]
   (case size
+    4 (.getInt data)
     6 [(.getInt data) (.getShort data)]
     8 [(.getInt data) (.getInt data)]
+    44 [(.getInt data) (.getInt data) (.getInt data)
+        (.getInt data) (.getInt data) (.getInt data)
+        (.getInt data) (.getInt data) (.getInt data)
+        (.getShort data) (.getShort data) (.getShort data) (.getShort data)]
     (.getInt data)))
 
 (defn read-vec
@@ -118,9 +123,25 @@
                      (map load-geometry-node geometry-nodes))]
     (into [] geometries)))
 
+(defn load-dynamic-geometry-node
+  [geometry-node]
+  (let []
+    (map :type (:children geometry-node))))
+
+(defmethod load-node "XFNM"
+  [{:keys [data size]}]
+  (str/split (get-string data (dec size)) #"\u0000"))
+
+(defmethod load-node "SKTM"
+  [{:keys [data size]}]
+  (get-string data (dec size)))
+
 (defmethod load-node "SKMG"
   [{:keys [size children] :as node}]
-  (map :type (node-seq node)))
+  (->> (node-seq node)
+       (filter util/record?)
+       (take 5)
+       (map load-node)))
 
 (def at-at
   (load-node (iff/load-iff-file "appearance/mesh/at_at_l0.mgn")))
