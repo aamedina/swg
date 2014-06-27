@@ -151,8 +151,10 @@
 
 (defmethod load-node "DOT3"
   [{:keys [data size]}]
-  (let [dot3-count (.getInt data)]
-    (into [] (repeatedly dot3-count #(read-vec data 4)))))
+  (let [fst (.getInt data)]
+    (if (== size (+ (* fst 16) 4))
+      (into [] (repeatedly fst #(read-vec data 4)))
+      (into [fst] (repeatedly (/ (- size 4) 4) #(.getInt data))))))
 
 (defmethod load-node "NORM"
   [{:keys [data size]}]
@@ -185,10 +187,11 @@
 (defmethod load-node "SKMG"
   [{:keys [size children] :as node}]
   (let [[info skeleton-file bones positions points
-         bone-and-weights normals dot3] (->> (node-seq node)
-                                             (filter util/record?)
-                                             (pmap load-node))]
-    dot3))
+         bone-and-weights normals dot3 shader-file & nodes]
+        (->> (node-seq node)
+             (filter util/record?)
+             (pmap load-node))]
+    (last (take 18 nodes))))
 
 (def at-at
   (time (load-node (iff/load-iff-file "appearance/mesh/at_at_l0.mgn"))))
