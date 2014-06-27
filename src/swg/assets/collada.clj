@@ -171,44 +171,24 @@
   (let [xml (xml/indent-str (xml/as-elements (collada geometries)))]
     (spit to-path xml)))
 
-;; (def yt1300
-;;   (binding [iff/*prefix-path* "resources/merged"]
-;;     (-> "resources/merged/appearance/mesh/yt1300_l0.msh"
-;;         iff/load-iff-file
-;;         load-node
-;;         (export-collada "resources/merged/yt1300.dae")
-;;         time)))
-
-;; (def star-destroyer
-;;   (binding [iff/*prefix-path* "resources/merged"]
-;;     (-> "resources/merged/appearance/mesh/star_destroyer_space_l0_c0_l0.msh"
-;;         iff/load-iff-file
-;;         load-node
-;;         (export-collada "resources/merged/star_destroyer.dae")
-;;         time)))
-
-;; (def theed-palace
-;;   (binding [iff/*prefix-path* "resources/merged"]
-;;     (-> "resources/merged/appearance/mesh/thm_nboo_thed_theed_palace_r0_mesh_l0_c0_l0.msh"
-;;         iff/load-iff-file
-;;         load-node
-;;         (export-collada "resources/merged/theed_palace.dae")
-;;         time)))
-
 (defn export-file
   [from-path to-path]
-  (-> (iff/load-iff-file from-path)
-      (load-node)
-      (export-collada to-path)
-      (time)))
+  (some-> (iff/load-iff-file from-path)
+          (load-node)      
+          (export-collada to-path)))
+
 (comment
+  (export-file "resources/merged/appearance/mesh/")
   (export-file "resources/merged/appearance/mesh/space_station.msh"
                "resources/merged/space_station.dae")
+  (export-file "resources/merged/appearance/mesh/yt1300_r3_lounge_mesh_r3.msh"
+               "resources/merged/yt1300_interior.dae")
   (let [files (->> (file-seq (io/as-file "resources/merged/appearance/mesh"))
-                   (filter #(re-seq #"star_destroyer_space_l0" (.getPath %)))
+                   (filter #(re-seq #".*msh$" (.getPath %)))
                    (interleave (range))
                    (partition 2))]
-    (time (doseq [[n file] files
-                  :let [prefix "resources/merged/star_destroyer_space_l0_"
-                        path (str prefix n ".dae")]]
-            (export-collada (load-node (iff/load-iff-file file)) path)))))
+    
+    (do (time (doall (pmap (fn [[n file]]
+                             (let [prefix "resources/merged/jedi_"
+                                   path (str prefix n ".dae")]
+                               (export-file file path))) files))))))

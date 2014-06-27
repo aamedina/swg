@@ -24,6 +24,11 @@
                 (assoc node :children (and children (apply vector children))))
               root))
 
+(defn node-seq
+  [root]
+  (->> (take-while (complement zip/end?) (iterate zip/next (iff-zipper root)))
+       (map zip/node)))
+
 (defn find-child
   [root pred]
   (loop [loc (iff-zipper root)]

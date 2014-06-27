@@ -39,20 +39,10 @@
 
 (defn load-iff-file
   ([path]
-     (let [buf (byte-buffer path)
+     (let [buf (byte-buffer (str *prefix-path* "/" path))
            header (read-form buf)]
        (load-children buf header)))
   ([prefix-path path-to-file]
      (let [buf (byte-buffer (str prefix-path "/" path-to-file))
            header (read-form buf)]
        (load-children buf header))))
-
-(def yt1300
-  (-> "resources/merged/appearance/mesh/yt1300_l1.msh"
-      load-iff-file
-      time))
-
-(def star-destroyer
-  (-> "resources/merged/appearance/mesh/star_destroyer.msh"
-      load-iff-file
-      time))

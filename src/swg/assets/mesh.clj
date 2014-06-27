@@ -118,15 +118,9 @@
                      (map load-geometry-node geometry-nodes))]
     (into [] geometries)))
 
-(def yt1300
-  (binding [iff/*prefix-path* "resources/merged"]
-    (-> "resources/merged/appearance/mesh/yt1300_l0.msh"
-        iff/load-iff-file
-        load-node
-        time)))
+(defmethod load-node "SKMG"
+  [{:keys [size children] :as node}]
+  (map :type (node-seq node)))
 
-;; (def star-destroyer
-;;   (-> "resources/extracted/appearance/mesh/star_destroyer.msh" iff/load-iff-file load-node time))
-
-;; (def theed-palace
-;;   (-> "resources/extracted/appearance/mesh/thm_nboo_thed_theed_palace_r0_mesh_l0_c0_l0.msh" iff/load-iff-file load-node time))
+(def at-at
+  (load-node (iff/load-iff-file "appearance/mesh/at_at_l0.mgn")))
