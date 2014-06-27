@@ -151,9 +151,8 @@
 
 (defmethod load-node "DOT3"
   [{:keys [data size]}]
-  #_(let [normals-count (/ (/ size 4) 3)]
-      (into [] (repeatedly normals-count #(read-vec data 3))))
-  size)
+  (let [dot3-count (.getInt data)]
+    (into [] (repeatedly dot3-count #(read-vec data 4)))))
 
 (defmethod load-node "NORM"
   [{:keys [data size]}]
@@ -186,10 +185,10 @@
 (defmethod load-node "SKMG"
   [{:keys [size children] :as node}]
   (let [[info skeleton-file bones positions points
-         bone-and-weights normals] (->> (node-seq node)
-                                        (filter util/record?)
-                                        (pmap load-node))]
-    normals))
+         bone-and-weights normals dot3] (->> (node-seq node)
+                                             (filter util/record?)
+                                             (pmap load-node))]
+    dot3))
 
 (def at-at
   (time (load-node (iff/load-iff-file "appearance/mesh/at_at_l0.mgn"))))
