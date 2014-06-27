@@ -128,6 +128,10 @@
   (let []
     (map :type (:children geometry-node))))
 
+(defmethod load-node "NIDX"
+  [{:keys [data size]}]
+  (into [] (repeatedly (/ size 4) #(.getInt data))))
+
 (defmethod load-node "PIDX"
   [{:keys [data size]}]
   (into [] (repeatedly (/ size 4) #(.getInt data))))
@@ -164,7 +168,7 @@
   [{:keys [size children] :as node}]
   (->> (node-seq node)
        (filter util/record?)
-       (drop 5)
+       (drop 10)
        (take 5)
        (map load-node)))
 
