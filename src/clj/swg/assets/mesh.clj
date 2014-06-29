@@ -64,18 +64,16 @@
 
 (defmethod load-node "SIDX"
   [{:keys [data size bpi children]}]
-  (r/reduce (fn [sets pos]
-              (let [rotations [(get-float data)
-                               (get-float data)
-                               (get-float data)]
-                  num-indices (.getInt data)
-                  indices (r/reduce (fn [indices pos]
-                                      (conj indices (case bpi
-                                                      2 (.getShort data)
-                                                      4 (.getInt data))))
-                                    [] (range 0 (* num-indices bpi) bpi))]
-              (conj sets {:rotations rotations :indices indices})))
-          [] (range (.getInt data))))
+  (into [] (repeatedly (.getInt data)
+                       (fn []
+                         (let [rotations [(get-float data)
+                                          (get-float data)
+                                          (get-float data)]
+                               index-count (.getInt data)
+                               indices (repeatedly (/ index-count 3)
+                                                   #(read-triangle data bpi))]
+                           {:rotations rotations
+                            :indices (into [] indices)})))))
 
 (defn load-geometry-node
   [geometry-node]
@@ -84,36 +82,37 @@
         [info vtxa indx sidx] (:children vnode)
         vertices (load-node vtxa)
         indices (load-node indx)
-        bpi (if (instance? java.lang.Short (first indices)) 2 4)
-        secondary nil
-        #_(when sidx (load-node (assoc sidx :bpi bpi)))]
-    (cond-> {:texture (load-node (iff/load-iff-file iff/*prefix-path* sht-file))
-             :vertices vertices
-             :indices indices}
+        bpi (/ (- (:size indx) 4) (* (count indices) 3))
+        secondary (when sidx (load-node (assoc sidx :bpi bpi)))]
+    (cond-> {:texture (load-node (iff/load-iff-file sht-file))
+             :positions (mapv :position vertices)
+             :normals (mapv :normal vertices)
+             :maps (mapv :map vertices)
+             :triangles indices}
       secondary (assoc :secondary secondary))))
 
-(defmethod load-node "CNT "
+(defmethod load-node "CNT"
   [{:keys [data]}]
   (.getInt data))
 
+(defmethod load-node "HPNT"
+  [{:keys [data size] :as node}]
+  {:transforms (mapv (fn [_]
+                       (into [] (repeatedly 4 #(.getFloat data))))
+                     (range 0 2))
+   :name (get-string data (- size 48))})
+
 (defmethod load-node "DATA"
   [{:keys [data size parent]}]
-  (case parent
-    "FLOR" (get-string data (.get data))
-    (let [bpv 32]
-      (into [] (pmap (fn [n]
-                       {:position (read-vec data 3)
-                        :normal (read-vec data 3)
-                        :color []
-                        :map (mapv #(read-vec data %) [2])})
-                     (range 0 (/ size bpv)))))))
+  (when (= parent "FLOR")
+    (get-string data (.get data))))
 
 (defmethod load-node "SPHR"
   [{:keys [data size]}]
   {:center (read-vec data 3)
    :radius (.getFloat data)})
 
-(defmethod load-node "BOX "
+(defmethod load-node "BOX"
   [{:keys [data size]}]
   {:length (read-vec data 3)
    :width (read-vec data 3)})
@@ -123,11 +122,9 @@
   {:base (read-vec data 3)
    :height (read-vec data 5)})
 
-(defmethod load-node "MESH"
-  [node]
-  (-> (load-all-nodes node)
-      (update-in ["NAME"] (partial mapv (comp load-node iff/load-iff-file))))
-  #_(let [root (first (:children (find-child node #(= (:type %) "SPS "))))
+(defmethod load-node "SPS"
+  [{:keys [children size] :as node}]
+  (let [root (first children)
         [cnt-node & geometry-nodes] (:children root)
         cnt (.getInt (:data cnt-node))
         geometries (if (>= (count geometry-nodes)
@@ -136,19 +133,25 @@
                      (map load-geometry-node geometry-nodes))]
     (into [] geometries)))
 
-(defn load-dynamic-geometry-node
-  [geometry-node]
-  (let []
-    (map :type (:children geometry-node))))
+(defmethod load-node "MESH"
+  [{:keys [children size] :as node}]
+  (load-node (find-child node #(= (:type %) "SPS"))))
 
-(defmethod load-node "ITL "
+(defmethod load-node "ITL"
   [{:keys [data size]}]
   (let [num (.getInt data)]
     (into [] (repeatedly num #(read-triangle data 4)))))
 
+(defmethod load-node "OITL"
+  [{:keys [data size]}]
+  (let [num (.getInt data)]
+    (into [] (repeatedly num #(read-triangle data 4 (.getInt data))))))
+
 (defmethod load-node "TCSD"
   [{:keys [data size]}]
-  (into [] (repeatedly (/ size 4) #(.getFloat data))))
+  (->> (repeatedly (/ size 4) #(.getFloat data))
+       (partition 2)
+       (mapv (comp vector vec))))
 
 (defmethod load-node "TXCI"
   [{:keys [data size]}]
@@ -200,11 +203,52 @@
 (defmethod load-node "SKMG"
   [{:keys [size children] :as node}]
   (-> (load-all-nodes node)
-      (update-in ["NAME"] (partial mapv (comp load-node iff/load-iff-file)))
-      (update-in ["SKTM"] (partial mapv (comp load-node iff/load-iff-file)))))
+      (update-in ["NAME"] (partial pmap (comp load-node iff/load-iff-file)))
+      (update-in ["SKTM"] (partial mapv (fn [file]
+                                          (-> (iff/load-iff-file file)
+                                              (load-node)
+                                              (assoc :skeleton-file file)))))))
 
-;; (def at-at
-;;   (time (load-node (iff/load-iff-file "appearance/mesh/at_at_l0.mgn"))))
+(defn load-mesh
+  [path]
+  (load-node (iff/load-iff-file path)))
 
-(def star-destroyer
-  (time (load-node (iff/load-iff-file "appearance/mesh/star_destroyer.msh"))))
+(defn load-skeleton
+  [skeleton]
+  (let [num-joints (first (skeleton "INFO"))
+        names (map (fn [names]
+                     (map str/lower-case names)) (skeleton "NAME"))
+        ks [:name :parent :pre-rotation :post-rotation :bone-offset :rotations]
+        joints (map interleave
+                    names (skeleton "PRNT") (skeleton "RPRE")
+                    (skeleton "RPST") (skeleton "BPTR") (skeleton "BPRO"))]
+    (->> (map #(partition 6 %) joints)
+         (mapv (fn [joint] (mapv #(zipmap ks %) joint))))))
+
+(defn load-mgn
+  [path]
+  (let [nodes (load-node (iff/load-iff-file path))
+        [_ _ skeleton-count bone-count vertex-count bone-weight-count
+         normal-count _ blend-table-count _ _ _ _] (first (nodes "INFO"))
+        positions (first (nodes "POSN"))
+        normals (first (nodes "NORM"))
+        bone-weights (first (nodes "TWDT"))
+        skeletons (load-skeleton (first (nodes "SKTM")))
+        bone-names (first (nodes "XFNM"))]
+    (mapv (fn [material pidx nidx tcsd itl]
+            {:texture material
+             :positions (mapv (partial nth positions) pidx)
+             :normals (mapv (partial nth normals) nidx)
+             :maps tcsd
+             :triangles itl
+             :skeletons skeletons
+             :bone-names bone-names
+             :bone-weights bone-weights})
+          (nodes "NAME") (nodes "PIDX") (nodes "NIDX") (nodes "TCSD")
+          (nodes "ITL"))))
+
+(def at-at
+  (time (load-mgn "appearance/mesh/at_at_l0.mgn")))
+
+(def skl
+  (:skeletons (first at-at)))

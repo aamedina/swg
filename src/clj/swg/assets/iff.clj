@@ -1,30 +1,39 @@
 (ns swg.assets.iff
-  (:use clojure.core.matrix)
   (:require [clojure.tools.namespace.repl :refer [refresh-all]]
             [clojure.java.io :as io]
+            [clojure.string :as str]
             [criterium.core :refer [quick-bench]]
-            [swg.assets.util :refer :all :exclude [record?]])
+            [swg.assets.util :as util :refer :all :exclude [record?]])
   (:import (java.io File RandomAccessFile)
            (java.nio ByteBuffer ByteOrder MappedByteBuffer)
            (java.nio.channels FileChannel FileChannel$MapMode)))
-
-(set-current-implementation :vectorz)
 
 (def ^:dynamic *prefix-path* "resources/merged")
 
 (defmulti load-node :type)
 
+(defmethod load-node "NULL" [node] nil)
+
 (defmethod load-node :default
-  [node]
-  node)
+  [{:keys [type size children] :as node}]
+  (if (seq children)
+    (reduce (fn [coll x]
+              (cond
+                (map? x) (conj coll x)
+                (and (vector? x) (coll? (first x))) (into coll x)
+                (nil? x) coll
+                :else (conj coll x)))
+            [] (map load-node children))
+    (when (nil? children)
+      node)))
 
 (defn read-form
   [buf]
   (let [tag (get-string buf 4)
         size (get-uint buf)]
     (if (= tag "FORM")
-      {:size size :type (get-string buf 4) :children []}
-      {:size size :type tag :data (read-bytes buf size)})))
+      {:size size :type (str/trim (get-string buf 4)) :children []}
+      {:size size :type (str/trim tag) :data (read-bytes buf size)})))
 
 (defn load-children
   [buf {:keys [size] :as parent}]

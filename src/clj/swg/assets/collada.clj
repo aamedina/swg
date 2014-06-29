@@ -9,8 +9,10 @@
             [clojure.core.reducers :as r]
             [hiccup.page :refer [xml-declaration]]
             [hiccup.def :refer [defelem defhtml]]
-            [clojure.data.xml :as xml])
-  (:import (java.io File RandomAccessFile)
+            [clojure.data.xml :as xml]
+            [clojure.zip :as zip])
+  (:import (org.apache.commons.io FilenameUtils)
+           (java.io File RandomAccessFile)
            (java.nio ByteBuffer ByteOrder MappedByteBuffer)
            (java.nio.channels FileChannel FileChannel$MapMode)
            (javax.xml.bind DatatypeConverter)))
@@ -76,13 +78,13 @@
                           [:ambient [:color (str/join " " ambient)]]
                           [:diffuse
                            [:texture {:texture (str "image" n "-sampler")
-                                      :texcoord (str "TEX" n)}]]
+                                      :texcoord "TEX0"}]]
                           [:specular [:color (str/join " " specular)]]
-                          [:shininess [:float shininess]]
-                          [:reflective [:color (str/join " " diffuse)]]
-                          [:reflectivity [:float "0.5"]]
-                          [:transparent [:color (str/join " " diffuse)]]
-                          [:transparency [:float a]]]]]])))
+                          [:shininess [:float 0]]
+                          [:reflective [:color "0 0 0 1"]]
+                          [:reflectivity [:float 0.5]]
+                          [:transparent {:opaque "RGB_ZERO"} [:color "0 0 0 1"]]
+                          [:transparency [:float 1]]]]]])))
                 geometries)])
 
 (defelem accessor-node
@@ -99,27 +101,26 @@
 
 (defelem source
   [n coll k name]
-  [:source {:id (str "geometry" n "-lib-" name) :name name}
-   [:float_array {:id (str "geometry" n "-lib-" name "s-array")
-                  :count (case k
-                           (:position :normal) (* (count coll) 3)
-                           :map (* (count coll) 2))}
-    (str/join " " (->> (flatten coll)
-                       (map #(.format formatter %))))]
-   [:technique_common (accessor-node n coll k name)]])
+  (let [flattened (flatten coll)]
+    [:source {:id (str "geometry" n "-lib-" name) :name name}
+     [:float_array {:id (str "geometry" n "-lib-" name "s-array")
+                    :count (count flattened)}
+      (str/join " " (->> flattened
+                         (map #(.format formatter %))))]
+     [:technique_common (accessor-node n coll k name)]]))
 
 (defelem geometry
-  [n {:keys [shader vertices indices secondary]}]
+  [n {:keys [positions normals maps triangles secondary]}]
   [:geometry {:id (str "geometry" n "-lib") :name (str "geometry" n)}
    [:mesh
-    (source n (map :position vertices) :position "position")
-    (source n (map :normal vertices) :normal "normal")
-    (for [m (range (count (:map (first vertices))))]
-      (source n (map (comp #(nth % m) :map) vertices) :map (str "map" m)))
+    (source n positions :position "position")
+    (source n normals :normal "normal")
+    (for [m (range (count (first maps)))]
+      (source n (mapv #(nth % m) maps) :map (str "map" m)))
     [:vertices {:id (str "geometry" n "-lib-positions-vertices")}
      [:input {:semantic "POSITION"
               :source (str "#geometry" n "-lib-position")}]]
-    [:triangles {:count (count indices)
+    [:triangles {:count (count triangles)
                  :material (str "geometry-material" n)}
      [:input {:semantic "VERTEX"
               :offset 0
@@ -127,30 +128,63 @@
      [:input {:semantic "NORMAL"
               :offset 0
               :source (str "#geometry" n "-lib-normal")}]
-     (for [m (range (count (:map (first vertices))))]
+     (for [m (range (count (first maps)))]
        [:input {:semantic "TEXCOORD"
                 :offset 0
                 :source (str "#geometry" n "-lib-map" m)}])
-     [:p (str/join " " (flatten indices))]]]])
+     [:p (str/join " " (flatten triangles))]]]])
 
 (defelem library-geometries
   [geometries]
   [:library_geometries
    (map-indexed geometry geometries)])
 
+(defelem controller
+  [n geometry]
+  [:controller {:id (str "controller" n)}
+   [:skin {:source (str "#geometry" n "-lib")}]])
+
+(defelem library-controllers
+  [geometries]
+  (when (some :skeletons geometries)
+    [:library_controllers
+     (map-indexed controller geometries)]))
+
+(defelem joint
+  [n geometry]
+  [:node {:id (str "mesh" n) :name "mesh" :type "JOINT"}
+   ])
+
+(defelem instance-controller
+  [n geometry]
+  [:instance_controller
+   [:skeleton ""]
+   [:bind_material
+    [:technique_common
+     [:instance_material {:symbol (str "geometry-material" n)
+                          :target (str "#material" n)}]]]])
+
+(defelem instance-geometry
+  [n geometry]
+  [:instance_geometry {:url (str "#" "geometry" n "-lib")}
+   [:bind_material
+    [:technique_common
+     [:instance_material {:symbol (str "geometry-material" n)
+                          :target (str "#material" n)}]]]])
+
 (defelem node
   [n geometry]
   [:node {:id (str "mesh" n) :name "mesh"}
-   [:instance_geometry {:url (str "#" "geometry" n "-lib")}
-    [:bind_material
-     [:technique_common
-      [:instance_material {:symbol (str "geometry-material" n)
-                           :target (str "#material" n)}]]]]])
+   (if (:skeletons geometry)
+     (instance-controller n geometry)
+     (instance-geometry n geometry))])
 
 (defelem library-visual-scenes
   [geometries]
   [:library_visual_scenes 
    [:visual_scene {:id "VisualSceneNode" :name "untitled"}
+    (when (some :skeletons geometries)
+      (map-indexed joint geometries))
     (map-indexed node geometries)]])
 
 (defelem collada
@@ -162,27 +196,43 @@
    (library-materials geometries)
    (library-effects geometries)
    (library-geometries geometries)
+   (library-controllers geometries)
    (library-visual-scenes geometries)
    [:scene
     [:instance_visual_scene {:url "#VisualSceneNode"}]]])
 
 (defn export-collada
   [geometries to-path]
-  (let [xml (xml/indent-str (xml/as-elements (collada geometries)))]
-    (spit to-path xml)))
+  (let [elements (collada geometries)
+        xml (xml/indent-str (xml/as-elements elements))]
+    (spit (str iff/*prefix-path* "/" to-path) xml)))
 
 (defn export-file
   [from-path to-path]
-  (some-> (iff/load-iff-file from-path)
-          (load-node)      
-          (export-collada to-path)))
+  (when-let [mesh (case (FilenameUtils/getExtension from-path)
+                    "msh" (mesh/load-mesh from-path)
+                    "mgn" (mesh/load-mgn from-path))]
+    (export-collada mesh to-path)))
+
+(defn import-file
+  [path]
+  (xml/parse (io/reader (io/as-file path))))
+
+(def monster (import-file "/Users/adrian/Downloads/monster.dae"))
+
+(export-file "appearance/mesh/star_destroyer.msh"
+               "star_destroyer.dae")
+
+(export-file "appearance/mesh/at_at_l0.mgn"
+             "at_at.dae")
 
 (comment
-  (export-file "resources/merged/appearance/mesh/")
-  (export-file "resources/merged/appearance/mesh/space_station.msh"
-               "resources/merged/space_station.dae")
-  (export-file "resources/merged/appearance/mesh/yt1300_r3_lounge_mesh_r3.msh"
-               "resources/merged/yt1300_interior.dae")
+  (export-file "appearance/mesh/star_destroyer.msh"
+               "star_destroyer.dae")
+  (export-file "appearance/mesh/space_station.msh"
+               "space_station.dae")
+  (export-file "appearance/mesh/yt1300_r3_lounge_mesh_r3.msh"
+               "yt1300_interior.dae")
   (let [files (->> (file-seq (io/as-file "resources/merged/appearance/mesh"))
                    (filter #(re-seq #".*msh$" (.getPath %)))
                    (interleave (range))

@@ -10,26 +10,22 @@
            (java.nio ByteBuffer ByteOrder MappedByteBuffer)
            (java.nio.channels FileChannel FileChannel$MapMode)))
 
-(defmethod load-node "MATS"
-  [node]
-  node)
-
-(defmethod load-node "TAG "
+(defmethod load-node "TAG"
   [{:keys [data]}]
   (get-string data 4))
 
 (defmethod load-node "MATL"
   [{:keys [data]}]
-  {:ambient (read-vec data 4)
-   :diffuse (read-vec data 4)
-   :specular (read-vec data 4)
-   :emissive (read-vec data 4)
+  {:ambient (read-rgba data)
+   :diffuse (read-rgba data)
+   :specular (read-rgba data)
+   :emissive (read-rgba data)
    :shininess (.getFloat data)})
 
 (defmethod load-node "SSHT"
   [{:keys [type children] :as node}]
   (let [mats (find-child node #(= (:type %) "MATS"))
-        tag (load-node (find-child node #(= (:type %) "TAG ")))
+        tag (load-node (find-child node #(= (:type %) "TAG")))
         colors (load-node (find-child node #(= (:type %) "MATL")))
         texture (find-child node #(= (:type %) "NAME"))
         texture-file (-> #_(str iff/*prefix-path* "/")
@@ -39,7 +35,7 @@
     (assoc colors
       :texture texture-file)))
 
-(defmethod load-node "PAL "
+(defmethod load-node "PAL"
   [{:keys [type data size] :as node}]
   (apply str (map char (repeatedly size #(.get data)))))
 
@@ -81,3 +77,6 @@
 
 (def at-at
   (time (load-node (iff/load-iff-file "appearance/mesh/at_at_l0.mgn"))))
+
+;; (def star-destroyer
+;;   (time (load-node (iff/load-iff-file "appearance/mesh/star_destroyer.msh"))))

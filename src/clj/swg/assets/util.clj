@@ -25,13 +25,22 @@
               root))
 
 (defn node-seq
-  [root]
-  (->> (take-while (complement zip/end?) (iterate zip/next (iff-zipper root)))
+  [zipper]
+  (->> (take-while (complement zip/end?) (iterate zip/next zipper))
        (map zip/node)))
 
 (defn find-child
   [root pred]
   (loop [loc (iff-zipper root)]
+    (if-let [node (when (pred (zip/node loc))
+                    (zip/node loc))]
+      node
+      (when-not (zip/end? loc)
+        (recur (zip/next loc))))))
+
+(defn find-xml-child
+  [root pred]
+  (loop [loc (zip/xml-zip root)]
     (if-let [node (when (pred (zip/node loc))
                     (zip/node loc))]
       node
@@ -129,11 +138,19 @@
   [(get-ubyte buf pos) (get-ubyte buf (+ pos 1))
    (get-ubyte buf (+ pos 2)) (get-ubyte buf (+ pos 3))])
 
+(defn read-rgba
+  [buf]
+  (into [] (reverse (repeatedly 4 #(.getFloat buf)))))
+
 (defn read-triangle
-  [data bpi]
-  (case bpi
-    2 [(.getShort data) (.getShort data) (.getShort data)]
-    4 [(.getInt data) (.getInt data) (.getInt data)]))
+  ([data bpi]
+     (case bpi
+       2 [(.getShort data) (.getShort data) (.getShort data)]
+       4 [(.getInt data) (.getInt data) (.getInt data)]))
+  ([data bpi group]
+     (case bpi
+       2 [group (.getShort data) (.getShort data) (.getShort data)]
+       4 [group (.getInt data) (.getInt data) (.getInt data)])))
 
 (defn read-quaternion
   [buf]
@@ -141,7 +158,7 @@
 
 (defn load-all-nodes
   [root]
-  (let [nodes (->> (node-seq root)
+  (let [nodes (->> (node-seq (iff-zipper root))
                    (filter record?)
                    (map (juxt :type (resolve 'swg.assets.iff/load-node)))
                    (group-by first))]
