@@ -74,9 +74,3 @@
 (defmethod load-node "SLOD"
   [{:keys [type children] :as node}]
   (load-all-nodes node))
-
-(def at-at
-  (time (load-node (iff/load-iff-file "appearance/mesh/at_at_l0.mgn"))))
-
-;; (def star-destroyer
-;;   (time (load-node (iff/load-iff-file "appearance/mesh/star_destroyer.msh"))))

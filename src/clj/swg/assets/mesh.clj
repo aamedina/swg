@@ -223,7 +223,8 @@
                     names (skeleton "PRNT") (skeleton "RPRE")
                     (skeleton "RPST") (skeleton "BPTR") (skeleton "BPRO"))]
     (->> (map #(partition 6 %) joints)
-         (mapv (fn [joint] (mapv #(zipmap ks %) joint))))))
+         (mapv (fn [joint] (mapv #(zipmap ks %) joint)))
+         (reduce into #{}))))
 
 (defn load-mgn
   [path]
@@ -247,8 +248,8 @@
           (nodes "NAME") (nodes "PIDX") (nodes "NIDX") (nodes "TCSD")
           (nodes "ITL"))))
 
-(def at-at
-  (time (load-mgn "appearance/mesh/at_at_l0.mgn")))
+;; (def at-at
+;;   (time (load-mgn "appearance/mesh/at_at_l0.mgn")))
 
-(def skl
-  (:skeletons (first at-at)))
+;; (def skl
+;;   (:skeletons (first at-at)))

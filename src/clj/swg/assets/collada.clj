@@ -1,5 +1,9 @@
 (ns swg.assets.collada
+  (:use clojure.core.matrix)
   (:require [clojure.tools.namespace.repl :refer [refresh-all]]
+            [clojure.core.matrix.operators :as ops]
+            [euclidean.math.quaternion :as q]
+            [euclidean.math.vector :as v]
             [clojure.java.io :as io]
             [criterium.core :refer [quick-bench]]
             [swg.assets.iff :as iff :refer [load-node]]
@@ -16,6 +20,8 @@
            (java.nio ByteBuffer ByteOrder MappedByteBuffer)
            (java.nio.channels FileChannel FileChannel$MapMode)
            (javax.xml.bind DatatypeConverter)))
+
+(set-current-implementation :vectorz)
 
 (defelem asset
   []
@@ -142,7 +148,21 @@
 (defelem controller
   [n geometry]
   [:controller {:id (str "controller" n)}
-   [:skin {:source (str "#geometry" n "-lib")}]])
+   [:skin {:source (str "#geometry" n "-lib")}
+    [:source {:id (str "controller" n "-joints")}
+     [:Name_array (str/join " " (:bone-names geometry))]]
+    [:joints
+     [:input {:semantic "JOINT" :source (str "#controller" n "-joints")}]
+     [:input {:semantic "INV_BIND_MATRIX" :source (str "#controller" n)}]]
+    [:vertex_weights {:id (str "controller" n "-joints")}
+     [:input {:semantic "JOINT"
+              :source (str "#controller" n "-joints")
+              :offset "0"}]
+     [:input {:semantic "WEIGHT"
+              :source (str "#controller" n "-weights")
+              :offset "1"}]
+     [:vcount]
+     [:v]]]])
 
 (defelem library-controllers
   [geometries]
@@ -218,21 +238,21 @@
   [path]
   (xml/parse (io/reader (io/as-file path))))
 
-(def monster (import-file "/Users/adrian/Downloads/monster.dae"))
+#_(def monster (import-file "/Users/adrian/Downloads/monster.dae"))
 
-(export-file "appearance/mesh/star_destroyer.msh"
-               "star_destroyer.dae")
+#_(export-file "appearance/mesh/star_destroyer.msh" "star_destroyer.dae")
 
-(export-file "appearance/mesh/at_at_l0.mgn"
-             "at_at.dae")
+#_(export-file "appearance/mesh/at_at_l0.mgn" "at_at.dae")
+
+#_(def at-at (mesh/load-mgn "appearance/mesh/at_at_l0.mgn"))
 
 (comment
-  (export-file "appearance/mesh/star_destroyer.msh"
-               "star_destroyer.dae")
   (export-file "appearance/mesh/space_station.msh"
                "space_station.dae")
-  (export-file "appearance/mesh/yt1300_r3_lounge_mesh_r3.msh"
-               "yt1300_interior.dae")
+  (def bone (rand-nth (last (:skeletons (first at-at)))))
+  (q/mult (q/into-quaternion (:pre-rotation bone))
+          (q/into-quaternion (:post-rotation bone)))
+  (:rotations bone)
   (let [files (->> (file-seq (io/as-file "resources/merged/appearance/mesh"))
                    (filter #(re-seq #".*msh$" (.getPath %)))
                    (interleave (range))
