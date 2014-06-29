@@ -146,11 +146,36 @@
    (map-indexed geometry geometries)])
 
 (defelem controller
-  [n geometry]
+  [n {:keys [bone-names] :as geometry}]
   [:controller {:id (str "controller" n)}
    [:skin {:source (str "#geometry" n "-lib")}
     [:source {:id (str "controller" n "-joints")}
-     [:Name_array (str/join " " (:bone-names geometry))]]
+     [:Name_array {:id (str "controller" n "-joints-array")
+                   :count (count bone-names)}
+      (str/join " " bone-names)]
+     [:technique_common
+      [:accessor {:source (str "#controller" n "-joints-array")
+                  :count (count bone-names)
+                  :stride 1}
+       [:param {:name "JOINT" :type "Name"}]]]]
+    [:source {:id (str "controller" n "-joints")}
+     [:Name_array {:id (str "controller" n "-joints-array")
+                   :count (count bone-names)}
+      (str/join " " bone-names)]
+     [:technique_common
+      [:accessor {:source (str "#controller" n "-joints-array")
+                  :count (count bone-names)
+                  :stride 1}
+       [:param {:name "JOINT" :type "Name"}]]]]
+    [:source {:id (str "controller" n "-weights")}
+     [:Name_array {:id (str "controller" n "-joints-array")
+                   :count (count bone-names)}
+      (str/join " " bone-names)]
+     [:technique_common
+      [:accessor {:source (str "#controller" n "-joints-array")
+                  :count (count bone-names)
+                  :stride 1}
+       [:param {:name "JOINT" :type "Name"}]]]]
     [:joints
      [:input {:semantic "JOINT" :source (str "#controller" n "-joints")}]
      [:input {:semantic "INV_BIND_MATRIX" :source (str "#controller" n)}]]
@@ -160,9 +185,7 @@
               :offset "0"}]
      [:input {:semantic "WEIGHT"
               :source (str "#controller" n "-weights")
-              :offset "1"}]
-     [:vcount]
-     [:v]]]])
+              :offset "1"}]]]])
 
 (defelem library-controllers
   [geometries]
@@ -170,15 +193,31 @@
     [:library_controllers
      (map-indexed controller geometries)]))
 
+(defelem joint-node
+  [n {:keys [name bone-offset pre-rotation post-rotation] :as bone}]
+  [:node {:id (str "mesh" n)
+          :name name
+          :type "JOINT"}
+   [:translate (str/join " " bone-offset)]
+   [:rotate (str/join " " (q/mult (q/into-quaternion pre-rotation)
+                                  (q/into-quaternion post-rotation)))]])
+
 (defelem joint
-  [n geometry]
-  [:node {:id (str "mesh" n) :name "mesh" :type "JOINT"}
-   ])
+  [n {:keys [skeletons bone-names] :as geometry}]
+  (loop [bone-names bone-names
+         element nil]
+    (if-let [bone (and (seq bone-names)
+                       (first (get skeletons (first bone-names))))]
+      (recur (rest bone-names)
+             (if (nil? element)
+               (joint-node n bone)
+               (conj element (joint-node n bone))))
+      element)))
 
 (defelem instance-controller
   [n geometry]
-  [:instance_controller
-   [:skeleton ""]
+  [:instance_controller {:url (str "#geometry" n "-lib")}
+   [:skeleton (str "#skeleton_root")]
    [:bind_material
     [:technique_common
      [:instance_material {:symbol (str "geometry-material" n)
@@ -242,9 +281,9 @@
 
 #_(export-file "appearance/mesh/star_destroyer.msh" "star_destroyer.dae")
 
-#_(export-file "appearance/mesh/at_at_l0.mgn" "at_at.dae")
+(export-file "appearance/mesh/at_at_l0.mgn" "at_at.dae")
 
-#_(def at-at (mesh/load-mgn "appearance/mesh/at_at_l0.mgn"))
+(def at-at (mesh/load-mgn "appearance/mesh/at_at_l0.mgn"))
 
 (comment
   (export-file "appearance/mesh/space_station.msh"

@@ -29,6 +29,7 @@
                  [cljs-http "0.1.12"]
                  [prismatic/dommy "0.1.2"]
                  [weasel "0.2.0"]]
+  :jvm-opts ^:replace ["-Xmx1g" "-server"]
   :source-paths ["src/clj"]
   :profiles {:dev {:dependencies [[ring "1.3.0"]
                                   [compojure "1.1.8"]

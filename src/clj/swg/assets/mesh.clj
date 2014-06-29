@@ -224,7 +224,8 @@
                     (skeleton "RPST") (skeleton "BPTR") (skeleton "BPRO"))]
     (->> (map #(partition 6 %) joints)
          (mapv (fn [joint] (mapv #(zipmap ks %) joint)))
-         (reduce into #{}))))
+         (reduce into #{})
+         (group-by :name))))
 
 (defn load-mgn
   [path]
