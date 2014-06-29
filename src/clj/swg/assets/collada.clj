@@ -194,25 +194,23 @@
      (map-indexed controller geometries)]))
 
 (defelem joint-node
-  [n {:keys [name bone-offset pre-rotation post-rotation] :as bone}]
-  [:node {:id (str "mesh" n)
-          :name name
-          :type "JOINT"}
-   [:translate (str/join " " bone-offset)]
-   [:rotate (str/join " " (q/mult (q/into-quaternion pre-rotation)
-                                  (q/into-quaternion post-rotation)))]])
+  [n bones]
+  (when (seq bones)
+    (let [{:keys [name bone-offset pre-rotation post-rotation rotations]
+           :as bone} (first bones)]
+      [:node {:sid name
+              :name name
+              :type "JOINT"}
+       [:translate (str/join " " (map #(.format formatter %) bone-offset))]
+       (when-not (= name "root")
+         [:rotate (str/join " " (->> (q/mult (q/into-quaternion pre-rotation)
+                                             (q/into-quaternion post-rotation))
+                                     (map #(.format formatter %))))])
+       (joint-node n (rest bones))])))
 
 (defelem joint
   [n {:keys [skeletons bone-names] :as geometry}]
-  (loop [bone-names bone-names
-         element nil]
-    (if-let [bone (and (seq bone-names)
-                       (first (get skeletons (first bone-names))))]
-      (recur (rest bone-names)
-             (if (nil? element)
-               (joint-node n bone)
-               (conj element (joint-node n bone))))
-      element)))
+  (joint-node {:id "skeleton_root"} n (map (comp first skeletons) bone-names)))
 
 (defelem instance-controller
   [n geometry]
