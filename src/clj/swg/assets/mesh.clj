@@ -244,12 +244,13 @@
     (mapv (fn [material pidx nidx tcsd itl dot3]
             {:texture material
              :positions (mapv (partial nth positions) pidx)
+             :position-indices pidx
              :normals (mapv (partial nth normals) nidx)
              :maps tcsd
              :triangles itl
              :bones skeleton
              :bone-names bone-names
-             :bone-weights bone-weights
+             :bone-weights (mapv (partial nth bone-weights) pidx)
              :dot3 dot3})
           (nodes "NAME") (nodes "PIDX") (nodes "NIDX") (nodes "TCSD")
           (nodes "ITL") (nodes "DOT3"))))

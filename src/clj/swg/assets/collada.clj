@@ -173,7 +173,7 @@
     [:source {:id (str "controller" n "-weights")}
      [:float_array {:id (str "controller" n "-weights-array")
                     :count (count positions)}
-      (str/join " " (->> (take (count positions) (map second bone-weights))
+      (str/join " " (->> (map second bone-weights)
                          (map #(.format formatter %))))]
      [:technique_common
       [:accessor {:source (str "#controller" n "-weights-array")
@@ -192,7 +192,8 @@
               :source (str "#controller" n "-weights")
               :offset 1}]
      [:vcount (str/join " " (repeat (count positions) 2))]
-     [:v (->> (map-indexed (fn [n [bone-idx _]] [bone-idx n]) bone-weights)
+     [:v (->> (map (fn [n [bone-idx _]] [bone-idx n])
+                   (:position-indices geometry) bone-weights)
               flatten
               (map #(.format formatter %))
               (str/join " "))]]]])
@@ -293,7 +294,7 @@
 
 (export-file "appearance/mesh/at_at_l0.mgn" "at_at.dae")
 
-#_(def at-at (mesh/load-mgn "appearance/mesh/at_at_l0.mgn"))
+(def at-at (mesh/load-mgn "appearance/mesh/at_at_l0.mgn"))
 
 (comment
   (export-file "appearance/mesh/space_station.msh"
