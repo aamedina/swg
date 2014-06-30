@@ -3,7 +3,9 @@
   (:require [clojure.tools.namespace.repl :refer [refresh-all]]
             [clojure.java.io :as io]
             [criterium.core :refer [quick-bench]]
-            [clojure.zip :as zip])
+            [clojure.zip :as zip]
+            [euclidean.math.quaternion :as q]
+            [euclidean.math.vector :as v])
   (:import (java.io File RandomAccessFile)
            (java.nio ByteBuffer ByteOrder MappedByteBuffer)
            (java.nio.channels FileChannel FileChannel$MapMode)))
@@ -154,7 +156,8 @@
 
 (defn read-quaternion
   [buf]
-  (into [] (repeatedly 4 #(.getFloat buf))))
+  (let [[w x y z] (repeatedly 4 #(.getFloat buf))]
+    [x y z w]))
 
 (defn load-all-nodes
   [root]
@@ -164,3 +167,21 @@
                    (group-by first))]
     (zipmap (keys nodes)
             (map (fn [group] (mapv second group)) (vals nodes)))))
+
+(defn bone-matrix
+  [{:keys [name bone-offset pre-rotation post-rotation rotations] :as bone}]
+  (let [[x y z] bone-offset
+        rot (q/mult (q/into-quaternion pre-rotation)
+                    (q/into-quaternion post-rotation))
+        rotation (q/rotate rot (v/into-vector bone-offset))
+        len2 (reduce + (map * rot rot))
+        rlen2 (if (== len2 1.0) 2.0 (/ 2.0 len2))
+        [qx qy qz qw] rot
+        [x2 y2 z2] (map * [rlen2 rlen2 rlen2] [qx qy qz])
+        [xx xy xz] (map * [qx qx qx] [x2 y2 z2])
+        [yy yz zz] (map * [qy qy qz] [y2 z2 z2])
+        [wx wy wz] (map * [qw qw qw] [x2 y2 z2])]
+    [[(- 1.0 (+ yy zz)) (+ xy wz) (- xz wy) x]
+     [(- xy wz) (- 1.0 (+ xx zz)) (+ yz wx) y]
+     [(+ xz wy) (- yz wx) (- 1.0 (+ xx yy)) z]
+     [0 0 0 1]]))

@@ -13,7 +13,7 @@
 
 (defmethod load-node "NAME"
   [{:keys [size data] :as node}]
-  (let [s (str/split (get-string data size) #"\u0000")]
+  (let [s (str/split (str/lower-case (get-string data size)) #"\u0000")]
     (if (== (count s) 1)
       (first s)
       s)))
@@ -214,43 +214,48 @@
   (load-node (iff/load-iff-file path)))
 
 (defn load-skeleton
-  [skeleton]
+  [skeleton lod]
   (let [num-joints (first (skeleton "INFO"))
-        names (map (fn [names]
-                     (map str/lower-case names)) (skeleton "NAME"))
-        ks [:name :parent :pre-rotation :post-rotation :bone-offset :rotations]
-        joints (map interleave
-                    names (skeleton "PRNT") (skeleton "RPRE")
-                    (skeleton "RPST") (skeleton "BPTR") (skeleton "BPRO"))]
-    (->> (map #(partition 6 %) joints)
-         (mapv (fn [joint] (mapv #(zipmap ks %) joint)))
-         (reduce into #{})
-         (group-by :name))))
+        ks [:name :parent :pre-rotation :post-rotation :bone-offset :rotations]]
+    (->> ["NAME" "PRNT" "RPRE" "RPST" "BPTR" "BPRO"]
+         (map #(nth (skeleton %) lod))
+         (apply interleave)
+         (partition 6)
+         (mapv #(zipmap ks %)))))
+
+(defn find-lod
+  [path]
+  (->> [[#"_l0" 0] [#"_l1" 1] [#"_l2" 2] [#"_l3" 3]]
+       (filter #(re-find (first %1) path))
+       first
+       second))
 
 (defn load-mgn
   [path]
   (let [nodes (load-node (iff/load-iff-file path))
+        lod (find-lod path)
         [_ _ skeleton-count bone-count vertex-count bone-weight-count
          normal-count _ blend-table-count _ _ _ _] (first (nodes "INFO"))
         positions (first (nodes "POSN"))
         normals (first (nodes "NORM"))
         bone-weights (first (nodes "TWDT"))
-        skeletons (load-skeleton (first (nodes "SKTM")))
-        bone-names (first (nodes "XFNM"))]
-    (mapv (fn [material pidx nidx tcsd itl]
+        bone-names (first (nodes "XFNM"))
+        skeleton (load-skeleton (first (nodes "SKTM")) lod)]
+    (mapv (fn [material pidx nidx tcsd itl dot3]
             {:texture material
              :positions (mapv (partial nth positions) pidx)
              :normals (mapv (partial nth normals) nidx)
              :maps tcsd
              :triangles itl
-             :skeletons skeletons
+             :bones skeleton
              :bone-names bone-names
-             :bone-weights bone-weights})
+             :bone-weights bone-weights
+             :dot3 dot3})
           (nodes "NAME") (nodes "PIDX") (nodes "NIDX") (nodes "TCSD")
-          (nodes "ITL"))))
+          (nodes "ITL") (nodes "DOT3"))))
 
-;; (def at-at
-;;   (time (load-mgn "appearance/mesh/at_at_l0.mgn")))
+(def at-at
+  (time (load-mgn "appearance/mesh/at_at_l0.mgn")))
 
 ;; (def skl
 ;;   (:skeletons (first at-at)))

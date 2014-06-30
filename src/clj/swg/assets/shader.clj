@@ -61,7 +61,7 @@
 
 (defmethod load-node "BPTR"
   [{:keys [data size] :as node}]
-  (into [] (repeatedly (/ (/ size 4) 3) #(read-vec data 3))))
+  (into [] (repeatedly (/ size 12) #(read-vec data 3))))
 
 (defmethod load-node "BPRO"
   [{:keys [data size] :as node}]
