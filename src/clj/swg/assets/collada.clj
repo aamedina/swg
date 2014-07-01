@@ -80,16 +80,16 @@
                           [:source (str "image" n "-surface")]]]
                         [:technique {:sid "common"}
                          [:phong
-                          [:emission [:color (str/join " " emissive)]]
+                          [:emission [:color "0 0 0 1"]]
                           [:ambient [:color (str/join " " ambient)]]
                           [:diffuse
                            [:texture {:texture (str "image" n "-sampler")
-                                      :texcoord "TEX0"}]]
-                          [:specular [:color (str/join " " specular)]]
-                          [:shininess [:float 0]]
+                                      :texcoord "CHANNEL1"}]]
+                          [:specular [:color (str/join " " diffuse)]]
+                          [:shininess [:float shininess]]
                           [:reflective [:color "0 0 0 1"]]
-                          [:reflectivity [:float 0.5]]
-                          [:transparent {:opaque "RGB_ZERO"} [:color "0 0 0 1"]]
+                          [:transparent {:opaque "A_ONE"}
+                           [:color (str/join " " diffuse)]]
                           [:transparency [:float 1]]]]]])))
                 geometries)])
 
@@ -97,13 +97,16 @@
   [n coll k name]
   (into [:accessor {:count (count coll)
                     :source (str "#" "geometry" n  "-lib-" name "s-array")
-                    :stride (case k (:position :normal) 3 :map 2)}]
+                    :stride (case k (:position :normal :pose) 3 :map 2)}]
         (case k
           (:position :normal) [[:param {:name "X" :type "float"}]
                                [:param {:name "Y" :type "float"}]
                                [:param {:name "Z" :type "float"}]]
           :map [[:param {:name "S" :type "float"}]
-                [:param {:name "T" :type "float"}]])))
+                [:param {:name "T" :type "float"}]]
+          :pose [[:param {:name "S" :type "float"}]
+                 [:param {:name "T" :type "float"}]
+                 [:param {:name "P" :type "float"}]])))
 
 (defelem source
   [n coll k name]
@@ -111,12 +114,11 @@
     [:source {:id (str "geometry" n "-lib-" name) :name name}
      [:float_array {:id (str "geometry" n "-lib-" name "s-array")
                     :count (count flattened)}
-      (str/join " " (->> flattened
-                         (map #(.format formatter %))))]
+      (str/join " " (map #(.format formatter %) flattened))]
      [:technique_common (accessor-node n coll k name)]]))
 
 (defelem geometry
-  [n {:keys [positions normals maps triangles secondary]}]
+  [n {:keys [positions normals maps poses triangles secondary]}]
   [:geometry {:id (str "geometry" n "-lib") :name (str "geometry" n)}
    [:mesh
     (source n positions :position "position")
@@ -134,10 +136,11 @@
      [:input {:semantic "NORMAL"
               :offset 0
               :source (str "#geometry" n "-lib-normal")}]
-     (for [m (range (count (first maps)))]
+     (for [m (range (count (or (first maps) (first poses))))]
        [:input {:semantic "TEXCOORD"
                 :offset 0
-                :source (str "#geometry" n "-lib-map" m)}])
+                :source (str "#geometry" n "-lib-map" m)
+                :set 1}])
      [:p (str/join " " (flatten triangles))]]]])
 
 (defelem library-geometries
@@ -246,16 +249,17 @@
   [n geometry]
   [:node {:id (str "mesh" n) :name "mesh"}
    (if (:bones geometry)
+     #_(instance-controller n geometry)
      (instance-geometry n geometry)
      (instance-geometry n geometry))])
 
 (defelem library-visual-scenes
   [geometries]
-  [:library_visual_scenes 
+  [:library_visual_scenes
    [:visual_scene {:id "VisualSceneNode" :name "untitled"}
+    (map-indexed node geometries)
     #_(when (some :bones geometries)
-        (map-indexed joint geometries))
-    (map-indexed node geometries)]])
+        (map-indexed joint geometries))]])
 
 (defelem collada
   [geometries]
@@ -266,7 +270,7 @@
    (library-materials geometries)
    (library-effects geometries)
    (library-geometries geometries)
-   (library-controllers geometries)
+   #_(library-controllers geometries)
    (library-visual-scenes geometries)
    [:scene
     [:instance_visual_scene {:url "#VisualSceneNode"}]]])
@@ -299,10 +303,6 @@
 (comment
   (export-file "appearance/mesh/space_station.msh"
                "space_station.dae")
-  (def bone (rand-nth (last (:bones (first at-at)))))
-  (q/mult (q/into-quaternion (:pre-rotation bone))
-          (q/into-quaternion (:post-rotation bone)))
-  (:rotations bone)
   (let [files (->> (file-seq (io/as-file "resources/merged/appearance/mesh"))
                    (filter #(re-seq #".*msh$" (.getPath %)))
                    (interleave (range))

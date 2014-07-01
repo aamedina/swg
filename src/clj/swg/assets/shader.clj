@@ -15,7 +15,7 @@
   (get-string data 4))
 
 (defmethod load-node "MATL"
-  [{:keys [data]}]
+  [{:keys [data size]}]
   {:ambient (read-rgba data)
    :diffuse (read-rgba data)
    :specular (read-rgba data)
@@ -24,16 +24,17 @@
 
 (defmethod load-node "SSHT"
   [{:keys [type children] :as node}]
-  (let [mats (find-child node #(= (:type %) "MATS"))
-        tag (load-node (find-child node #(= (:type %) "TAG")))
-        colors (load-node (find-child node #(= (:type %) "MATL")))
-        texture (find-child node #(= (:type %) "NAME"))
-        texture-file (-> #_(str iff/*prefix-path* "/")
-                         (get-string (:data texture) (dec (:size texture)))
-                         (str/replace #"dds$" "png")
-                         (str/replace #"\\" "/"))]
-    (assoc colors
-      :texture texture-file)))
+  (-> (load-all-nodes node)
+      )
+  #_(let [mats (find-child node #(= (:type %) "MATS"))
+          tag (load-node (find-child node #(= (:type %) "TAG")))
+          colors (load-node (find-child node #(= (:type %) "MATL")))
+          texture (find-child node #(= (:type %) "NAME"))
+          texture-file (-> (get-string (:data texture) (dec (:size texture)))
+                           (str/replace #"dds$" "png")
+                           (str/replace #"\\" "/"))]
+      (assoc colors
+        :texture texture-file)))
 
 (defmethod load-node "PAL"
   [{:keys [type data size] :as node}]

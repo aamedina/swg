@@ -137,12 +137,15 @@
 
 (defn read-color
   [buf pos]
-  [(get-ubyte buf pos) (get-ubyte buf (+ pos 1))
-   (get-ubyte buf (+ pos 2)) (get-ubyte buf (+ pos 3))])
+  [(get-ubyte buf pos)
+   (get-ubyte buf (+ pos 1))
+   (get-ubyte buf (+ pos 2))
+   (get-ubyte buf (+ pos 3))])
 
 (defn read-rgba
   [buf]
-  (into [] (reverse (repeatedly 4 #(.getFloat buf)))))
+  (let [[a r g b] (repeatedly 4 #(.getFloat buf))]
+    [r g b a]))
 
 (defn read-triangle
   ([data bpi]

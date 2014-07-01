@@ -104,8 +104,10 @@
 
 (defmethod load-node "DATA"
   [{:keys [data size parent]}]
-  (when (= parent "FLOR")
-    (get-string data (.get data))))
+  (if (= parent "FLOR")
+    (get-string data size)
+    (let [tag (get-string data 4)]
+      tag)))
 
 (defmethod load-node "SPHR"
   [{:keys [data size]}]
@@ -200,10 +202,21 @@
   [{:keys [data size]}]
   (get-string data (dec size)))
 
+(defmethod load-node "0000"
+  [{:keys [data size parent]}]
+  (case parent
+    "TCSS" [(get-string data 4) (.get data)]
+    "TFNS" (into [] (repeatedly size #(.get data)))
+    "ARVS" (into [] (repeatedly size #(.get data)))
+    parent))
+
 (defmethod load-node "SKMG"
   [{:keys [size children] :as node}]
   (-> (load-all-nodes node)
-      (update-in ["NAME"] (partial pmap (comp load-node iff/load-iff-file)))
+      (update-in ["NAME"] (partial pmap (fn [file]
+                                          (-> (iff/load-iff-file file)
+                                              (load-node)
+                                              (assoc :shader-file file)))))
       (update-in ["SKTM"] (partial mapv (fn [file]
                                           (-> (iff/load-iff-file file)
                                               (load-node)
