@@ -22,19 +22,22 @@
    :emissive (read-rgba data)
    :shininess (.getFloat data)})
 
+(def image? (partial re-find #"png$"))
+
 (defmethod load-node "SSHT"
   [{:keys [type children] :as node}]
-  (-> (load-all-nodes node)
-      )
-  #_(let [mats (find-child node #(= (:type %) "MATS"))
-          tag (load-node (find-child node #(= (:type %) "TAG")))
-          colors (load-node (find-child node #(= (:type %) "MATL")))
-          texture (find-child node #(= (:type %) "NAME"))
-          texture-file (-> (get-string (:data texture) (dec (:size texture)))
-                           (str/replace #"dds$" "png")
-                           (str/replace #"\\" "/"))]
-      (assoc colors
-        :texture texture-file)))
+  (let [nodes (load-all-nodes node)
+        material (first (nodes "MATL"))
+        [images files] (->> (map (fn [image]
+                                   (-> image
+                                       (str/replace #"dds$" "png")
+                                       (str/replace #"\\" "/")))
+                                 (distinct (nodes "NAME")))
+                            ((juxt (partial filter image?)
+                                   (partial remove image?))))]
+    {:files files
+     :images images
+     :material material}))
 
 (defmethod load-node "PAL"
   [{:keys [type data size] :as node}]

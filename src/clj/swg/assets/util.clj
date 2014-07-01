@@ -136,11 +136,10 @@
   [(get-float buf pos) (get-float buf (+ pos 4)) (get-float buf (+ pos 8))])
 
 (defn read-color
-  [buf pos]
-  [(get-ubyte buf pos)
-   (get-ubyte buf (+ pos 1))
-   (get-ubyte buf (+ pos 2))
-   (get-ubyte buf (+ pos 3))])
+  ([buf]
+     (into [] (->> (repeatedly 4 #(get-ubyte buf)) (map #(/ % 255.0)))))
+  ([buf pos]
+     (into [] (for [pos (range pos (+ 4 pos))] (/ (get-ubyte buf pos) 255.0)))))
 
 (defn read-rgba
   [buf]

@@ -205,10 +205,10 @@
 (defmethod load-node "0000"
   [{:keys [data size parent]}]
   (case parent
-    "TCSS" [(get-string data 4) (.get data)]
-    "TFNS" (into [] (repeatedly size #(.get data)))
-    "ARVS" (into [] (repeatedly size #(.get data)))
-    parent))
+    "TCSS" {:tag (get-string data 4) :byte (.get data)}
+    "TFNS" {:tag (get-string data 4) :color (read-color data)}
+    "ARVS" {:tag (get-string data 4) :byte (.get data)}
+    (into [] (repeatedly size #(.get data)))))
 
 (defmethod load-node "SKMG"
   [{:keys [size children] :as node}]
