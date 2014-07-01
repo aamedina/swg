@@ -28,10 +28,19 @@
   [node]
   (let [nodes (load-all-nodes node)]
     {:vertex-shaders (into [] (filter #(re-find #"vsh$" %) (nodes "0000")))
-     :tags (mapv (fn [[n & chars]]
-                   [n (apply str (map char chars))]) (nodes "0002"))
-     :optional-tags (mapv #(apply str (map char %)) (nodes "0002"))
-     :nodes (dissoc nodes "0000" "0001" "0002")}))
+     :tags (let [m (->> (nodes "0002")
+                        (map (fn [[n & chars]]
+                               [n (apply str (map char chars))]) )
+                        (group-by first))]
+             (zipmap (keys m) (map #(mapv (comp str/reverse second) %)
+                                   (vals m))))
+     :optional-tags (->> (nodes "OPTN")
+                         (map #(apply str (map char %)))
+                         (mapv str/reverse))
+     :pixel-shaders (->> (filter string? (nodes "DATA"))
+                         (filter #(re-find #"psh$" %) )
+                         (into []))
+     :nodes (dissoc nodes "0000" "0001" "0002" "DATA" "OPTN")}))
 
 (defmethod load-node "SSHT"
   [{:keys [type children] :as node}]
@@ -87,3 +96,7 @@
 (defmethod load-node "SLOD"
   [{:keys [type children] :as node}]
   (load-all-nodes node))
+
+(defmethod load-node "OPTN"
+  [{:keys [data size] :as node}]
+  (get-string data size))
