@@ -106,8 +106,13 @@
   [{:keys [data size parent]}]
   (if (= parent "FLOR")
     (get-string data size)
-    (let [tag (get-string data 4)]
-      tag)))
+    (case size
+      2 (.getShort data)
+      4 (.getInt data)
+      (case (.get data)
+        0 [(.getShort data) (.getShort data)]
+        1 [(get-string data 4) (.getShort data)]
+        (get-string data (- size 2))))))
 
 (defmethod load-node "SPHR"
   [{:keys [data size]}]
@@ -194,6 +199,10 @@
   (let [vertex-count (/ (/ size 4) 3)]
     (into [] (repeatedly vertex-count #(read-vec data 3)))))
 
+(defmethod load-node "SCAP"
+  [{:keys [data size]}]
+  (into [] (repeatedly (/ size 4) #(.getInt data))))
+
 (defmethod load-node "XFNM"
   [{:keys [data size]}]
   (str/split (get-string data size) #"\u0000"))
@@ -208,7 +217,10 @@
     "TCSS" {:tag (get-string data 4) :byte (.get data)}
     "TFNS" {:tag (get-string data 4) :color (read-color data)}
     "ARVS" {:tag (get-string data 4) :byte (.get data)}
-    (into [] (repeatedly size #(.get data)))))
+    (let [bytes (into [] (repeatedly size #(.get data)))]
+      (if (and (every? (complement neg?) bytes) (zero? (peek bytes)))
+        (apply str (map char (pop bytes)))
+        bytes))))
 
 (defmethod load-node "SKMG"
   [{:keys [size children] :as node}]

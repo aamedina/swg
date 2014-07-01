@@ -24,19 +24,28 @@
 
 (def image? (partial re-find #"png$"))
 
+(defmethod load-node "EFCT"
+  [node]
+  (let [nodes (load-all-nodes node)]
+    {:vertex-shaders (into [] (filter #(re-find #"vsh$" %) (nodes "0000")))
+     :tags (mapv (fn [[n & chars]]
+                   [n (apply str (map char chars))]) (nodes "0002"))
+     :optional-tags (mapv #(apply str (map char %)) (nodes "0002"))
+     :nodes (dissoc nodes "0000" "0001" "0002")}))
+
 (defmethod load-node "SSHT"
   [{:keys [type children] :as node}]
   (let [nodes (load-all-nodes node)
         material (first (nodes "MATL"))
-        [images files] (->> (map (fn [image]
-                                   (-> image
-                                       (str/replace #"dds$" "png")
-                                       (str/replace #"\\" "/")))
-                                 (distinct (nodes "NAME")))
-                            ((juxt (partial filter image?)
-                                   (partial remove image?))))]
-    {:files files
-     :images images
+        [images effects] (->> (map (fn [image]
+                                     (-> image
+                                         (str/replace #"dds$" "png")
+                                         (str/replace #"\\" "/")))
+                                   (distinct (nodes "NAME")))
+                              ((juxt (partial filter image?)
+                                     (partial remove image?))))]
+    {:effects (mapv #(load-node (iff/load-iff-file %)) effects)
+     :images (into [] images)
      :material material}))
 
 (defmethod load-node "PAL"

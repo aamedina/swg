@@ -15,7 +15,7 @@
 (defmethod load-node "NULL" [node] nil)
 
 (defmethod load-node :default
-  [{:keys [type size children] :as node}]
+  [{:keys [data type size children] :as node}]
   (if (seq children)
     (reduce (fn [coll x]
               (cond
@@ -25,7 +25,7 @@
                 :else (conj coll x)))
             [] (map load-node children))
     (when (nil? children)
-      node)))
+      (into [] (repeatedly size #(.get data))))))
 
 (defn read-form
   [buf]
