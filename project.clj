@@ -6,7 +6,7 @@
   :repositories {"sonatype-oss-public"
                  "https://oss.sonatype.org/content/groups/public/"}
   :dependencies [[org.clojure/clojure "1.6.0"]
-                 [org.clojure/clojurescript "0.0-2234"]
+                 [org.clojure/clojurescript "0.0-2261"]
                  [org.clojure/core.async "0.1.303.0-886421-alpha"]
                  [org.clojure/tools.namespace "0.2.4"]
                  [org.clojure/tools.logging "0.3.0"]
@@ -28,7 +28,7 @@
                  [sablono "0.2.17"]
                  [cljs-http "0.1.12"]
                  [prismatic/dommy "0.1.2"]
-                 [weasel "0.2.0"]]
+                 [weasel "0.3.0"]]
   :jvm-opts ^:replace ["-Xmx1g" "-server"]
   :source-paths ["src/clj"]
   :profiles {:dev {:dependencies [[ring "1.3.0"]
@@ -43,15 +43,8 @@
   :hooks [leiningen.cljsbuild]
   :cljsbuild {:builds
               [{:id "dev"
-                :source-paths ["src/cljs"]
+                :source-paths ["src/cljs" "src/clj" "dev"]
                 :compiler {:output-to "resources/public/js/main.js"
                            :output-dir "resources/public/js/out"
                            :source-map true
-                           :optimizations :none}}
-               {:id "prod"
-                :source-paths ["src/cljs"]
-                :compiler {:output-to "resources/public/js/main.js"
-                           :pretty-print false
-                           :preamble ["react/react.min.js"]
-                           :externs ["react/externs/react.js"]
-                           :optimizations :advanced}}]})
+                           :optimizations :none}}]})

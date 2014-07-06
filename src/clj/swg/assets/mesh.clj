@@ -109,10 +109,10 @@
     (case size
       2 (.getShort data)
       4 (.getInt data)
-      (case (.get data)
-        0 [(.getShort data) (.getShort data)]
-        1 [(get-string data 4) (.getShort data)]
-        (get-string data (- size 2))))))
+      7 [(.get data) (.getInt data)]
+      56 (into [] (repeatedly 14 #(.getFloat data)))
+      (do (.get data)
+          (get-string data (- size 2))))))
 
 (defmethod load-node "SPHR"
   [{:keys [data size]}]
@@ -208,8 +208,10 @@
   (str/split (get-string data size) #"\u0000"))
 
 (defmethod load-node "SKTM"
-  [{:keys [data size]}]
-  (get-string data (dec size)))
+  [{:keys [data size children] :as node}]
+  (if (seq children)
+    (load-all-nodes node)
+    (get-string data (dec size))))
 
 (defmethod load-node "0000"
   [{:keys [data size parent]}]
@@ -259,6 +261,7 @@
   [path]
   (let [nodes (load-node (iff/load-iff-file path))
         lod (find-lod path)
+        lod (if-not (integer? lod) 0 lod)
         [_ _ skeleton-count bone-count vertex-count bone-weight-count
          normal-count _ blend-table-count _ _ _ _] (first (nodes "INFO"))
         positions (first (nodes "POSN"))
@@ -280,8 +283,11 @@
           (nodes "NAME") (nodes "PIDX") (nodes "NIDX") (nodes "TCSD")
           (nodes "ITL") (nodes "DOT3"))))
 
-(def at-at
+#_(def at-at
   (time (load-mgn "appearance/mesh/at_at_l0.mgn")))
+
+;; (def nodes
+;;   (load-all-nodes (iff/load-iff-file "appearance/mesh/at_at_l0.mgn")))
 
 ;; (def skl
 ;;   (:skeletons (first at-at)))

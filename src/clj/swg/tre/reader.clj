@@ -109,13 +109,13 @@
 (defn extract
   [from-path to-path]
   (let [unpacked-archive (unpack from-path)]
-    (pmap (fn [{:keys [name bytes]}]
-            (let [file (java.io.File. (str to-path "/" name))]
-              (when-not (.exists file)
-                (.mkdirs (.getParentFile file))
-                (with-open [raf (RandomAccessFile. file "rw")
-                            ch (.getChannel raf)]
-                  (.write ch bytes))))) unpacked-archive)))
+    (doseq [{:keys [name bytes]} unpacked-archive]
+      (let [file (java.io.File. (str to-path "/" name))]
+        (when-not (.exists file)
+          (.mkdirs (.getParentFile file))
+          (with-open [raf (RandomAccessFile. file "rw")
+                      ch (.getChannel raf)]
+            (.write ch bytes)))) )))
 
 (defn extract-all-tres
   [dir to-path]
@@ -123,5 +123,4 @@
        (filter #(.endsWith (.getPath %) ".tre"))
        (remove #(.isDirectory %))
        (map #(.getPath %))
-       (pmap #(extract % to-path))
-       (doall)))
+       (pmap #(extract % to-path))))

@@ -38,7 +38,7 @@
                          (map #(apply str (map char %)))
                          (mapv str/reverse))
      :pixel-shaders (->> (filter string? (nodes "DATA"))
-                         (filter #(re-find #"psh$" %) )
+                         (filter #(re-find #"psh$" %))
                          (into []))
      :nodes (dissoc nodes "0000" "0001" "0002" "DATA" "OPTN")}))
 
@@ -46,16 +46,32 @@
   [{:keys [type children] :as node}]
   (let [nodes (load-all-nodes node)
         material (first (nodes "MATL"))
-        [images effects] (->> (map (fn [image]
-                                     (-> image
-                                         (str/replace #"dds$" "png")
-                                         (str/replace #"\\" "/")))
-                                   (distinct (nodes "NAME")))
+        [images effects] (->> (distinct (nodes "NAME"))
+                              (map #(str/replace % #"\\" "/"))
+                              (map #(str/replace % #"dds$" "png"))
                               ((juxt (partial filter image?)
-                                     (partial remove image?))))]
-    {:effects (mapv #(load-node (iff/load-iff-file %)) effects)
-     :images (into [] images)
-     :material material}))
+                                     (partial remove image?))))
+        effects (mapv #(load-node (iff/load-iff-file %)) effects)]
+    (reduce (fn [material image]
+                        (cond
+                          (re-find #"specular" image)
+                          (assoc material
+                            ;; :specular image
+                            :images (assoc (:images material)
+                                      :specular image))
+
+                          (re-find #"_n.png$" image)
+                          (assoc material
+                            ;; :normal image
+                            :images (assoc (:images material)
+                                      :normal image))
+
+                          :else (assoc material
+                                  ;; :diffuse image
+                                  :images (assoc (:images material)
+                                            :diffuse image))))
+            (assoc material
+              :effects effects) images)))
 
 (defmethod load-node "PAL"
   [{:keys [type data size] :as node}]

@@ -48,9 +48,10 @@
   [geometries]
   [:library_images
    (map-indexed (fn [n {:keys [texture]}]
-                  [:image {:id (str "image" n)
-                           :name (str "image" n)}
-                   [:init_from (str "./" (:texture texture))]])
+                  (for [[k image] (into (sorted-map) (:images texture))]
+                    [:image {:id (str (name k) n)
+                             :name (str (name k) n)}
+                     [:init_from (str "./" image)]]))
                 geometries)])
 
 (defelem library-materials
@@ -68,29 +69,34 @@
    (map-indexed (fn [n {:keys [texture]}]
                   (let [{:keys [ambient diffuse specular emissive shininess]
                          :as colors} texture]
-                    (let [[r g b a] diffuse]
+                    (let [[r g b a] diffuse
+                          images (into (sorted-map) (:images texture))]
                       [:effect {:id (str "effect" n)}
                        [:profile_COMMON
-                        [:newparam {:sid (str "image" n "-surface")}
-                         [:surface {:type "2D"}
-                          [:init_from (str "image" n)]
-                          [:format "A8R8G8B8"]]]
-                        [:newparam {:sid (str "image" n "-sampler")}
+                        [:newparam {:sid (str "diffuse" n "-surface")}
+                        [:surface {:type "2D"}
+                         [:init_from (str "diffuse" n)]]]
+                        [:newparam {:sid (str "diffuse" n "-sampler")}
                          [:sampler2D
-                          [:source (str "image" n "-surface")]]]
+                          [:source (str "diffuse" n "-surface")]]]
                         [:technique {:sid "common"}
                          [:phong
-                          [:emission [:color "0 0 0 1"]]
+                          [:emission [:color (str/join " " emissive)]]
                           [:ambient [:color (str/join " " ambient)]]
                           [:diffuse
-                           [:texture {:texture (str "image" n "-sampler")
-                                      :texcoord "CHANNEL1"}]]
-                          [:specular [:color (str/join " " diffuse)]]
-                          [:shininess [:float shininess]]
-                          [:reflective [:color "0 0 0 1"]]
+                           [:texture {:texture (str "diffuse" n "-sampler")
+                                      :texcoord (str "uv" n)}]]
+                          [:specular [:color (str/join " " specular)]]
+                          [:shininess [:float 10]]
                           [:transparent {:opaque "A_ONE"}
-                           [:color (str/join " " diffuse)]]
-                          [:transparency [:float 1]]]]]])))
+                           [:texture {:texture (str "diffuse" n "-sampler")
+                                      :texcoord (str "uv" n)}]]
+                          [:transparency [:float 1]]]
+                         [:extra
+                          [:technique {:profile "FCOLLADA"}
+                           [:bump
+                            [:texture {:texture (str "diffuse" n "-sampler")
+                                       :texcoord (str "uv" n)}]]]]]]])))
                 geometries)])
 
 (defelem accessor-node
@@ -102,8 +108,8 @@
           (:position :normal) [[:param {:name "X" :type "float"}]
                                [:param {:name "Y" :type "float"}]
                                [:param {:name "Z" :type "float"}]]
-          :map [[:param {:name "S" :type "float"}]
-                [:param {:name "T" :type "float"}]]
+          :map [[:param {:name "U" :type "float"}]
+                [:param {:name "V" :type "float"}]]
           :pose [[:param {:name "S" :type "float"}]
                  [:param {:name "T" :type "float"}]
                  [:param {:name "P" :type "float"}]])))
@@ -235,7 +241,9 @@
    [:bind_material
     [:technique_common
      [:instance_material {:symbol (str "geometry-material" n)
-                          :target (str "#material" n)}]]]])
+                          :target (str "#material" n)}
+      [:bind_vertex_input {:semantic (str "uv" n)
+                           :input_semantic "TEXCOORD"}]]]]])
 
 (defelem instance-geometry
   [n geometry]
@@ -243,7 +251,9 @@
    [:bind_material
     [:technique_common
      [:instance_material {:symbol (str "geometry-material" n)
-                          :target (str "#material" n)}]]]])
+                          :target (str "#material" n)}
+      [:bind_vertex_input {:semantic (str "uv" n)
+                           :input_semantic "TEXCOORD"}]]]]])
 
 (defelem node
   [n geometry]
@@ -296,13 +306,11 @@
 
 #_(export-file "appearance/mesh/star_destroyer.msh" "star_destroyer.dae")
 
-(export-file "appearance/mesh/at_at_l0.mgn" "at_at.dae")
+#_(export-file "appearance/mesh/at_st_l0.mgn" "at_st.dae")
 
-(def at-at (mesh/load-mgn "appearance/mesh/at_at_l0.mgn"))
+#_(def at-at (mesh/load-mgn "appearance/mesh/at_at_l0.mgn"))
 
 (comment
-  (export-file "appearance/mesh/space_station.msh"
-               "space_station.dae")
   (let [files (->> (file-seq (io/as-file "resources/merged/appearance/mesh"))
                    (filter #(re-seq #".*msh$" (.getPath %)))
                    (interleave (range))
