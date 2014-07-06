@@ -173,7 +173,7 @@
         (render-loop this (om/get-state owner)))
       (html [:canvas]))))
 
-(defn -main
+(defn ^:export -main
   [& args]
   (enable-console-print!)
   (om/root canvas {:loader (THREE.ColladaLoader.)

@@ -47,4 +47,12 @@
                 :compiler {:output-to "resources/public/js/main.js"
                            :output-dir "resources/public/js/out"
                            :source-map true
-                           :optimizations :none}}]})
+                           :optimizations :none}}
+               {:id "prod"
+                :source-paths ["src/cljs"]
+                :compiler {:output-to "resources/public/js/main.js"
+                           :pretty-print false
+                           :preamble ["react/react.min.js"]
+                           :externs ["react/externs/react.js"
+                                     "resources/public/js/three.js"]
+                           :optimizations :advanced}}]})

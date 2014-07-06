@@ -1,5 +1,7 @@
 # swg
 
+http://aamedina.github.io/swg
+
 ## License
 
 Copyright © 2014 Adrian Medina
