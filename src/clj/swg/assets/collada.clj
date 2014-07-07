@@ -74,11 +74,30 @@
                       [:effect {:id (str "effect" n)}
                        [:profile_COMMON
                         [:newparam {:sid (str "diffuse" n "-surface")}
-                        [:surface {:type "2D"}
-                         [:init_from (str "diffuse" n)]]]
+                         [:surface {:type "2D"}
+                          [:init_from (str "diffuse" n)]
+                          [:format "R8G8B8A8"]]]
                         [:newparam {:sid (str "diffuse" n "-sampler")}
                          [:sampler2D
                           [:source (str "diffuse" n "-surface")]]]
+                        (when (contains? images :specular)
+                          [:newparam {:sid (str "specular" n "-surface")}
+                           [:surface {:type "2D"}
+                            [:init_from (str "specular" n)]
+                            [:format "R8G8B8A8"]]])
+                        (when (contains? images :specular)
+                          [:newparam {:sid (str "specular" n "-sampler")}
+                           [:sampler2D
+                            [:source (str "specular" n "-surface")]]])
+                        (when (contains? images :normal)
+                          [:newparam {:sid (str "normal" n "-surface")}
+                           [:surface {:type "2D"}
+                            [:init_from (str "normal" n)]
+                            [:format "R8G8B8A8"]]])
+                        (when (contains? images :normal)
+                          [:newparam {:sid (str "normal" n "-sampler")}
+                           [:sampler2D
+                            [:source (str "normal" n "-surface")]]])
                         [:technique {:sid "common"}
                          [:phong
                           [:emission [:color (str/join " " emissive)]]
@@ -86,10 +105,22 @@
                           [:diffuse
                            [:texture {:texture (str "diffuse" n "-sampler")
                                       :texcoord (str "uv" n)}]]
+                          #_[:diffuse [:color (str/join " " diffuse)]]
                           [:specular [:color (str/join " " specular)]]
-                          [:shininess [:float shininess]]
-                          [:transparent {:opaque "RGB_ZERO"} [:color "0 0 0 1"]]
-                          [:transparency [:float 1]]]]]])))
+                          [:shininess [:float shininess]]]
+                         #_[:extra
+                          [:technique {:sid "phong"}
+                           [:diffuse
+                            [:texture {:texture (str "diffuse" n "-sampler")
+                                       :texcoord (str "uv" n)}]]
+                           (when (contains? images :specular)
+                             [:specular
+                              [:texture {:texture (str "specular" n "-sampler")
+                                         :texcoord (str "uv" n)}]])
+                           (when (contains? images :normal)
+                             [:bump {:bumptype "normalmap"}
+                              [:texture {:texture (str "normal" n "-sampler")
+                                         :texcoord (str "uv" n)}]])]]]]])))
                 geometries)])
 
 (defelem accessor-node
@@ -137,9 +168,9 @@
               :source (str "#geometry" n "-lib-normal")}]
      (for [m (range (count (or (first maps) (first poses))))]
        [:input {:semantic "TEXCOORD"
-                :offset 0
+                :offset m
                 :source (str "#geometry" n "-lib-map" m)
-                :set m}])
+                :set (inc m)}])
      [:p (str/join " " (flatten triangles))]]]])
 
 (defelem library-geometries
@@ -290,7 +321,8 @@
                     "msh" (mesh/load-mesh from-path)
                     "mgn" (mesh/load-mgn from-path)
                     nil)]
-    (export-collada mesh to-path)))
+    (export-collada mesh to-path)
+    mesh))
 
 (defn import-file
   [path]
@@ -301,19 +333,20 @@
 #_(export-file "appearance/mesh/star_destroyer.msh"
                "../models/star_destroyer.dae")
 
-#_(def at-at (mesh/load-mgn "appearance/mesh/at_at_l0.mgn"))
+(def at-at (export-file "appearance/mesh/at_at_l0.mgn"
+                        "../models/at_at_l0.dae"))
 
-(export-file "appearance/mesh/star_destroyer_space_l0_c6_l0.msh"
-             "../models/star_destroyer_space_l0_c6_l0.dae")
+#_(export-file "appearance/mesh/star_destroyer_space_l0_c6_l0.msh"
+               "../models/star_destroyer_space_l0_c6_l0.dae")
 
-(def sd (mesh/load-mesh "appearance/mesh/star_destroyer_space_l0_c6_l0.msh"))
+#_(def sd (mesh/load-mesh "appearance/mesh/star_destroyer_space_l0_c6_l0.msh"))
 
 (defn export-all
   []
   (->> (file-seq (io/file "resources/public/resources/appearance/mesh"))
        (remove #(.isDirectory %))
        (filter #(re-find #"msh|mgn" (.getPath %)))
-       (filter #(re-find #"l0" (.getPath %)))
+       (remove #(re-find #"_l1|_l2|_l3|_l4|_l5|_l6" (.getPath %)))
        (pmap (fn [file]
                (let [model (last (str/split (.getPath file) #"/"))
                      path (str/replace (str "../models/" model)

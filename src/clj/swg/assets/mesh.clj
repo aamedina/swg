@@ -87,6 +87,7 @@
     (cond-> {:texture (load-node (iff/load-iff-file sht-file))
              :positions (mapv :position vertices)
              :normals (mapv :normal vertices)
+             :colors (mapv :color vertices)
              :maps (->> (map :map vertices)
                         (mapv (fn [uvs] (mapv (fn [[u v]] [u (- 1.0 v)]) uvs))))
              :triangles indices}

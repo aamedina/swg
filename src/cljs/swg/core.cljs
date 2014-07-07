@@ -24,7 +24,18 @@
 (defprotocol IRenderScene
   (render-scene [component scene-state state]))
 
-(def app-state (atom {}))
+(def app-state (atom {:loader (THREE.ColladaLoader.)
+                      :models [#_"models/shuttle_rebel_l0.dae"
+                               #_"models/asteroid_all_large_01_l0.dae"
+                               #_"models/poi_protocol_droid_body_l0.dae"
+                               "models/at_at_l0.dae"
+                               "models/at_st_l0.dae"
+                               #_"models/decd_blba_tree_a1_l0.dae"
+                               #_"models/corellian_corvette_l0_c3_l0.dae"
+                               #_"models/corellian_corvette_l0_c1_l0.dae"
+                               #_"models/corellian_corvette_l0_c0_l0.dae"
+                               #_"models/smuggler_warlord_ship_l0.dae"]
+                      :clock (THREE.Clock.)}))
 
 (defn debounce
   [msecs out]
@@ -76,14 +87,21 @@
               (om/update! data (merge @data scene-state))
               (loop []
                 (when-let [model (<! loader-chan)]
-                  (.add scene model)
-                  (recur)))))))
-    
+                  (let [mesh (.-scene model)]
+                    (js/console.log mesh)
+                    ;; (.set (.-position mesh)
+                    ;;       (rand-int 255)
+                    ;;       (rand-int 255)
+                    ;;       (rand-int 255))
+                    ;; (.updateMatrix scene)
+                    (.add scene mesh)
+                    (recur))))))))
     om/IDidMount
     (did-mount [this]
       (let [[width height] (om/get-state owner :size)
             renderer (THREE.WebGLRenderer. #js {:canvas (om/get-node owner)
-                                                :antialias true})]
+                                                :antialias true
+                                                :alpha true})]
         (om/set-state! owner :renderer (doto renderer
                                          (.setSize width height)))))
 
@@ -114,7 +132,10 @@
         (.normalize (.set (.-position light1) 1 1 1))
         (.normalize (.set (.-position light2) -1 -1 -1))
 
-        (.load loader (str "./" (first models)) #(put! loader-chan (.-scene %)))
+        (set! (.. loader -options -convertUpAxis) true)
+
+        (doseq [model models]
+          (.load (THREE.ColladaLoader.) (str "./" model) #(put! loader-chan %)))
         
         (.set (.-position camera) 7 5 5)
         
@@ -123,7 +144,7 @@
         (.setClearColor renderer (.. scene -fog -color) 1)
         
         {:scene (doto scene
-                  #_(.add (grid 14 1))
+                  (.add (grid 14 1))
                   (.add (THREE.AmbientLight. 0x222222))
                   (.add light1)
                   (.add light2))
@@ -139,13 +160,12 @@
         (.setSize (:renderer state) width height)))
 
     IAnimateScene
-    (animate-scene [this {:keys [scene camera clock model controls]
+    (animate-scene [this {:keys [scene camera clock controls]
                           :as scene-state} state]
       (.update controls))
 
     IRenderScene
-    (render-scene [this {:keys [scene camera clock model]
-                         :as scene-state} state])
+    (render-scene [this {:keys [scene camera clock] :as scene-state} state])
     
     IRenderLoop
     (render-loop [this {:keys [renderer] :as state}]
@@ -176,7 +196,4 @@
 (defn ^:export -main
   [& args]
   (enable-console-print!)
-  (om/root canvas {:loader (THREE.ColladaLoader.)
-                   :models ["models/shuttle_rebel_l0.dae"]
-                   :clock (THREE.Clock.)}
-           {:target (sel1 :#content)}))
+  (om/root canvas app-state {:target (sel1 :#content)}))

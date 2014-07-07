@@ -52,6 +52,7 @@
                               ((juxt (partial filter image?)
                                      (partial remove image?))))
         effects (mapv #(load-node (iff/load-iff-file %)) effects)]
+    #_(println images)
     (reduce (fn [material image]
                         (cond
                           (re-find #"spec" image)
