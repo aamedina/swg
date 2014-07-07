@@ -1,7 +1,0 @@
-{"version":3,
- "file":
- "/Users/adrian/workspace/clojure/swg/resources/public/js/out/cljs/user.js",
- "sources":["user.cljs"],
- "lineCount":8,
- "mappings":";AAAA;;;;AAGA,8BAAA,9BAACA",
- "names":["weasel.repl/connect"]}
