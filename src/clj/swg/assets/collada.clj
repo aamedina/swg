@@ -51,7 +51,7 @@
                   (for [[k image] (into (sorted-map) (:images texture))]
                     [:image {:id (str (name k) n)
                              :name (str (name k) n)}
-                     [:init_from (str "./" image)]]))
+                     [:init_from (str "../resources/" image)]]))
                 geometries)])
 
 (defelem library-materials
@@ -87,16 +87,9 @@
                            [:texture {:texture (str "diffuse" n "-sampler")
                                       :texcoord (str "uv" n)}]]
                           [:specular [:color (str/join " " specular)]]
-                          [:shininess [:float 10]]
-                          [:transparent {:opaque "A_ONE"}
-                           [:texture {:texture (str "diffuse" n "-sampler")
-                                      :texcoord (str "uv" n)}]]
-                          [:transparency [:float 1]]]
-                         [:extra
-                          [:technique {:profile "FCOLLADA"}
-                           [:bump
-                            [:texture {:texture (str "diffuse" n "-sampler")
-                                       :texcoord (str "uv" n)}]]]]]]])))
+                          [:shininess [:float shininess]]
+                          [:transparent {:opaque "RGB_ZERO"} [:color "0 0 0 1"]]
+                          [:transparency [:float 1]]]]]])))
                 geometries)])
 
 (defelem accessor-node
@@ -146,7 +139,7 @@
        [:input {:semantic "TEXCOORD"
                 :offset 0
                 :source (str "#geometry" n "-lib-map" m)
-                :set 1}])
+                :set m}])
      [:p (str/join " " (flatten triangles))]]]])
 
 (defelem library-geometries
@@ -295,7 +288,8 @@
   [from-path to-path]
   (when-let [mesh (case (FilenameUtils/getExtension from-path)
                     "msh" (mesh/load-mesh from-path)
-                    "mgn" (mesh/load-mgn from-path))]
+                    "mgn" (mesh/load-mgn from-path)
+                    nil)]
     (export-collada mesh to-path)))
 
 (defn import-file
@@ -304,19 +298,27 @@
 
 #_(def monster (import-file "/Users/adrian/Downloads/monster.dae"))
 
-#_(export-file "appearance/mesh/star_destroyer.msh" "star_destroyer.dae")
-
-#_(export-file "appearance/mesh/at_st_l0.mgn" "at_st.dae")
+#_(export-file "appearance/mesh/star_destroyer.msh"
+               "../models/star_destroyer.dae")
 
 #_(def at-at (mesh/load-mgn "appearance/mesh/at_at_l0.mgn"))
 
-(comment
-  (let [files (->> (file-seq (io/as-file "resources/merged/appearance/mesh"))
-                   (filter #(re-seq #".*msh$" (.getPath %)))
-                   (interleave (range))
-                   (partition 2))]
-    
-    (do (time (doall (pmap (fn [[n file]]
-                             (let [prefix "resources/merged/jedi_"
-                                   path (str prefix n ".dae")]
-                               (export-file file path))) files))))))
+(export-file "appearance/mesh/star_destroyer_space_l0_c6_l0.msh"
+             "../models/star_destroyer_space_l0_c6_l0.dae")
+
+(def sd (mesh/load-mesh "appearance/mesh/star_destroyer_space_l0_c6_l0.msh"))
+
+(defn export-all
+  []
+  (->> (file-seq (io/file "resources/public/resources/appearance/mesh"))
+       (remove #(.isDirectory %))
+       (filter #(re-find #"msh|mgn" (.getPath %)))
+       (filter #(re-find #"l0" (.getPath %)))
+       (pmap (fn [file]
+               (let [model (last (str/split (.getPath file) #"/"))
+                     path (str/replace (str "../models/" model)
+                                       #"msh|mgn" "dae")]
+                 (try (export-file (str "appearance/mesh/" model) path)
+                      (catch Exception e (println model))))))
+       (doall))
+  nil)

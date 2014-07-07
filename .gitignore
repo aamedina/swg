@@ -9,5 +9,7 @@ pom.xml.asc
 /.nrepl-port
 *.DS_Store
 /resources/public/resources
+/resources/public/models
+/resources/public/js/out
 /out
 /.repl

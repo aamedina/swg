@@ -125,15 +125,15 @@
 
 (defn read-vec
   [buf n]
-  (vec (repeatedly n #(get-float buf))))
+  (into [] (repeatedly n #(.getFloat buf))))
 
 (defn read-vec2
   [buf pos]
-  [(get-float buf pos) (get-float buf (+ pos 4))])
+  [(.getFloat buf pos) (.getFloat buf (+ pos 4))])
 
 (defn read-vec3
   [buf pos]
-  [(get-float buf pos) (get-float buf (+ pos 4)) (get-float buf (+ pos 8))])
+  [(.getFloat buf pos) (.getFloat buf (+ pos 4)) (.getFloat buf (+ pos 8))])
 
 (defn read-color
   ([buf]

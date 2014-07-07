@@ -8,7 +8,7 @@
            (java.nio ByteBuffer ByteOrder MappedByteBuffer)
            (java.nio.channels FileChannel FileChannel$MapMode)))
 
-(def ^:dynamic *prefix-path* "resources/merged")
+(def ^:dynamic *prefix-path* "resources/public/resources")
 
 (defmulti load-node :type)
 
@@ -16,16 +16,17 @@
 
 (defmethod load-node :default
   [{:keys [data type size children] :as node}]
-  (if (seq children)
-    (reduce (fn [coll x]
-              (cond
-                (map? x) (conj coll x)
-                (and (vector? x) (coll? (first x))) (into coll x)
-                (nil? x) coll
-                :else (conj coll x)))
-            [] (map load-node children))
-    (when (nil? children)
-      (into [] (repeatedly size #(.get data))))))
+  (when node
+    (if (seq children)
+      (reduce (fn [coll x]
+                (cond
+                  (map? x) (conj coll x)
+                  (and (vector? x) (coll? (first x))) (into coll x)
+                  (nil? x) coll
+                  :else (conj coll x)))
+              [] (map load-node children))
+      (when (nil? children)
+        (into [] (repeatedly size #(.get data)))))))
 
 (defn read-form
   [buf]
@@ -49,9 +50,10 @@
 
 (defn load-iff-file
   ([path]
-     (let [buf (byte-buffer (str *prefix-path* "/" path))
-           header (read-form buf)]
-       (load-children buf header)))
+     (try (let [buf (byte-buffer (str *prefix-path* "/" path))
+                header (read-form buf)]
+            (load-children buf header))
+          (catch Exception e)))
   ([prefix-path path-to-file]
      (let [buf (byte-buffer (str prefix-path "/" path-to-file))
            header (read-form buf)]

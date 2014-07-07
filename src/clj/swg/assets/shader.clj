@@ -54,13 +54,18 @@
         effects (mapv #(load-node (iff/load-iff-file %)) effects)]
     (reduce (fn [material image]
                         (cond
-                          (re-find #"specular" image)
+                          (re-find #"spec" image)
                           (assoc material
                             ;; :specular image
                             :images (assoc (:images material)
                                       :specular image))
 
-                          (re-find #"_n.png$" image)
+                          (re-find #"detail" image)
+                          (assoc material
+                            :images (assoc (:images material)
+                                      :detail image))
+
+                          (re-find #"_n.png$|_cn.png$" image)
                           (assoc material
                             ;; :normal image
                             :images (assoc (:images material)

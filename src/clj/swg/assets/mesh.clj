@@ -23,7 +23,7 @@
   (case size
     2 (.getShort data)
     4 (.getInt data)
-    6 [(.getInt data) (.getShort data)]
+    6 [(.getShort data) (.getShort data) (.getShort data)]
     8 [(.getInt data) (.getInt data)]
     44 [(.getInt data) (.getInt data) (.getInt data)
         (.getInt data) (.getInt data) (.getInt data)
@@ -87,7 +87,8 @@
     (cond-> {:texture (load-node (iff/load-iff-file sht-file))
              :positions (mapv :position vertices)
              :normals (mapv :normal vertices)
-             :maps (mapv :map vertices)
+             :maps (->> (map :map vertices)
+                        (mapv (fn [uvs] (mapv (fn [[u v]] [u (- 1.0 v)]) uvs))))
              :triangles indices}
       secondary (assoc :secondary secondary))))
 
@@ -152,7 +153,9 @@
 (defmethod load-node "OITL"
   [{:keys [data size]}]
   (let [num (.getInt data)]
-    (into [] (repeatedly num #(read-triangle data 4 (.getInt data))))))
+    (->> (repeatedly num #(read-triangle data 4 (.getShort data)))
+         (mapv (fn [[group x y z]] [x y z]))
+         (into []))))
 
 (defmethod load-node "TCSD"
   [{:keys [data size]}]
@@ -180,9 +183,10 @@
       (into [fst] (repeatedly (/ (- size 4) 4) #(.getInt data))))))
 
 (defmethod load-node "NORM"
-  [{:keys [data size]}]
-  (let [normals-count (/ (/ size 4) 3)]
-    (into [] (repeatedly normals-count #(read-vec data 3)))))
+  [{:keys [data size parent]}]
+  (if (= parent "BLT")
+    (into [] (repeatedly (/ (/ size 4) 4) #(read-vec data 4)))
+    (into [] (repeatedly (/ (/ size 4) 3) #(read-vec data 3)))))
 
 (defmethod load-node "TWDT"
   [{:keys [data size]}]
@@ -195,9 +199,10 @@
   (into [] (repeatedly (/ size 4) #(.getInt data))))
 
 (defmethod load-node "POSN"
-  [{:keys [data size]}]
-  (let [vertex-count (/ (/ size 4) 3)]
-    (into [] (repeatedly vertex-count #(read-vec data 3)))))
+  [{:keys [data size parent]}]
+  (if (= parent "BLT")
+    (into [] (repeatedly (/ (/ size 4) 4) #(read-vec data 4)))
+    (into [] (repeatedly (/ (/ size 4) 3) #(read-vec data 3)))))
 
 (defmethod load-node "SCAP"
   [{:keys [data size]}]
@@ -215,22 +220,29 @@
 
 (defmethod load-node "0000"
   [{:keys [data size parent]}]
-  (case parent
+  (when data
+    (case parent
     "TCSS" {:tag (get-string data 4) :byte (.get data)}
     "TFNS" {:tag (get-string data 4) :color (read-color data)}
     "ARVS" {:tag (get-string data 4) :byte (.get data)}
-    (let [bytes (into [] (repeatedly size #(.get data)))]
-      (if (and (every? (complement neg?) bytes) (zero? (peek bytes)))
-        (apply str (map char (pop bytes)))
-        bytes))))
+    (when data
+      (let [bytes (into [] (repeatedly size #(.get data)))]
+        (cond
+          (and (every? (complement neg?) bytes) (zero? (peek bytes)))
+          (apply str (map char (pop bytes)))
+          (every? (complement neg?) bytes)
+          (apply str (map char bytes))
+          :else bytes))))))
 
 (defmethod load-node "SKMG"
   [{:keys [size children] :as node}]
   (-> (load-all-nodes node)
       (update-in ["NAME"] (partial pmap (fn [file]
-                                          (-> (iff/load-iff-file file)
-                                              (load-node)
-                                              (assoc :shader-file file)))))
+                                          (let [sht (-> (iff/load-iff-file file)
+                                                        (load-node))]
+                                            (if (map? sht)
+                                              (assoc sht :shader-file file)
+                                              file)))))
       (update-in ["SKTM"] (partial mapv (fn [file]
                                           (-> (iff/load-iff-file file)
                                               (load-node)
@@ -269,25 +281,21 @@
         bone-weights (first (nodes "TWDT"))
         bone-names (first (nodes "XFNM"))
         skeleton (load-skeleton (first (nodes "SKTM")) lod)]
-    (mapv (fn [material pidx nidx tcsd itl dot3]
+    (mapv (fn [material pidx nidx tcsd itl]
             {:texture material
              :positions (mapv (partial nth positions) pidx)
              :position-indices pidx
              :normals (mapv (partial nth normals) nidx)
-             :maps tcsd
+             :maps (mapv (fn [[[u v]]] [[u (- 1.0 v)]]) tcsd)
              :triangles itl
              :bones skeleton
              :bone-names bone-names
-             :bone-weights (mapv (partial nth bone-weights) pidx)
-             :dot3 dot3})
+             :bone-weights (mapv (partial nth bone-weights) pidx)})
           (nodes "NAME") (nodes "PIDX") (nodes "NIDX") (nodes "TCSD")
-          (nodes "ITL") (nodes "DOT3"))))
+          (or (nodes "ITL") (nodes "OITL")))))
 
 #_(def at-at
   (time (load-mgn "appearance/mesh/at_at_l0.mgn")))
 
-;; (def nodes
-;;   (load-all-nodes (iff/load-iff-file "appearance/mesh/at_at_l0.mgn")))
-
-;; (def skl
-;;   (:skeletons (first at-at)))
+#_(def helmet
+    (load-mgn "appearance/mesh/apron_chef_jacket_s01_m_l0.dae"))
