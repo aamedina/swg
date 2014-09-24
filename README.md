@@ -9,6 +9,8 @@ YourKit is kindly supporting SWG with its full-featured Java Profiler. YourKit, 
 * <a href="http://www.yourkit.com/java/profiler/index.jsp">YourKit Java Profiler</a> and
 * <a href="http://www.yourkit.com/.net/profiler/index.jsp">YourKit .NET Profiler</a>.
 
+![](doc/yklogo.png)
+
 ## License
 
 Copyright © 2014 Adrian Medina
